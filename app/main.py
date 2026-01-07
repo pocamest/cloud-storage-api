@@ -1,19 +1,16 @@
-from fastapi import FastAPI
-from sqlalchemy import text
+from fastapi import APIRouter, FastAPI
 
-from app.core.dependencies import SessionDep
+from app.core.exception_handlers import register_exceptions_handler
 from app.core.logging import setup_logging
+from app.users.router import router as users_router
 
 setup_logging()
 
 app = FastAPI(title="Cloud storage API")
+register_exceptions_handler(app)
 
+api_router = APIRouter()
 
-@app.get("/")
-async def root(session: SessionDep) -> dict[str, str]:
-    try:
-        await session.execute(text("SELECT 1"))
-        return {"message": "Cloud storage API"}
+api_router.include_router(users_router)
 
-    except Exception as e:
-        return {"error_message": str(e)}
+app.include_router(api_router, prefix="/api/v1")
