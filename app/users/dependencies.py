@@ -7,14 +7,16 @@ from app.users.repositories import UserRepository
 from app.users.services import UserService
 
 
-def get_user_repo(session: SessionDep) -> UserRepository:
+async def get_user_repo(session: SessionDep) -> UserRepository:
     return UserRepository(session)
 
 
 UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repo)]
 
 
-def get_user_service(session: SessionDep, user_repo: UserRepositoryDep) -> UserService:
+async def get_user_service(
+    session: SessionDep, user_repo: UserRepositoryDep
+) -> UserService:
     return UserService(session=session, user_repo=user_repo)
 
 
