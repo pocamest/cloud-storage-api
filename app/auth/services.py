@@ -9,6 +9,8 @@ from app.auth.exceptions import InvalidCredentialsError
 from app.auth.repositories import TokenRepository
 from app.auth.schemas import AuthCreate
 from app.auth.types import JWTPayload
+from app.users.models import User
+from app.users.schemes import UserCreate
 from app.users.services import UserService
 
 
@@ -73,14 +75,7 @@ class AuthService:
         self.user_service = user_service
         self.token_service = token_service
 
-    async def login(self, auth_data: AuthCreate) -> AuthDTO:
-        user = await self.user_service.find_by_credentials(
-            email=auth_data.email, password=auth_data.password
-        )
-
-        if user is None:
-            raise InvalidCredentialsError()
-
+    async def _create_tokens(self, user: User) -> AuthDTO:
         user_id = user.id
         access_token = self.token_service.create_access_token(user_id)
         refresh_token = await self.token_service.create_refresh_token(user_id)
@@ -93,3 +88,17 @@ class AuthService:
             expires_in=expires_in,
             user=user,
         )
+
+    async def login(self, auth_data: AuthCreate) -> AuthDTO:
+        user = await self.user_service.find_by_credentials(
+            email=auth_data.email, password=auth_data.password
+        )
+
+        if user is None:
+            raise InvalidCredentialsError()
+
+        return await self._create_tokens(user)
+
+    async def register(self, user_data: UserCreate) -> AuthDTO:
+        user = await self.user_service.create_user(user_data)
+        return await self._create_tokens(user)
