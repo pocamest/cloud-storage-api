@@ -5,10 +5,15 @@ from typing import Any, cast
 import jwt
 
 from app.auth.dtos import AuthDTO
-from app.auth.exceptions import InvalidCredentialsError
+from app.auth.exceptions import (
+    InvalidCredentialsError,
+    TokenExpiredError,
+    TokenInvalidError,
+)
 from app.auth.repositories import TokenRepository
 from app.auth.schemas import AuthCreate
 from app.auth.types import JWTPayload
+from app.users.exceptions import UserNotFoundError
 from app.users.models import User
 from app.users.schemes import UserCreate
 from app.users.services import UserService
@@ -69,6 +74,19 @@ class TokenService:
             algorithm=self.algorithm,
         )
 
+    def verify_token(self, token: str) -> JWTPayload:
+        try:
+            payload: JWTPayload = jwt.decode(
+                jwt=token, key=self.secret_key, algorithms=[self.algorithm]
+            )
+        except jwt.ExpiredSignatureError as e:
+            raise TokenExpiredError() from e
+
+        except jwt.InvalidTokenError as e:
+            raise TokenInvalidError() from e
+
+        return payload
+
 
 class AuthService:
     def __init__(self, user_service: UserService, token_service: TokenService):
@@ -102,3 +120,14 @@ class AuthService:
     async def register(self, user_data: UserCreate) -> AuthDTO:
         user = await self.user_service.create_user(user_data)
         return await self._create_tokens(user)
+
+    async def get_user_by_token(self, token: str) -> User:
+        payload = self.token_service.verify_token(token)
+        user_id = int(payload["sub"])
+
+        try:
+            user = await self.user_service.get_by_id(user_id)
+        except UserNotFoundError as e:
+            raise TokenInvalidError() from e
+
+        return user

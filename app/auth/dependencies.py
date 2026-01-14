@@ -1,12 +1,14 @@
 from typing import Annotated
 
 from fastapi import Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.auth.repositories import TokenRepository
 from app.auth.services import AuthService, TokenService
 from app.core.config import settings
 from app.core.dependencies import RedisDep
 from app.users.dependencies import UserServiceDep
+from app.users.models import User
 
 
 async def get_token_repo(redis_client: RedisDep) -> TokenRepository:
@@ -36,3 +38,17 @@ async def get_auth_service(
 
 
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
+
+
+security = HTTPBearer()
+
+
+async def get_current_user(
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+    auth_service: AuthServiceDep,
+) -> User:
+    token = credentials.credentials
+    return await auth_service.get_user_by_token(token)
+
+
+CurrentUserDep = Annotated[User, Depends(get_current_user)]
