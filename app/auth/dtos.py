@@ -10,3 +10,11 @@ class AuthDTO:
     expires_in: int
     user: User
     token_type: str = "bearer"
+
+
+@dataclass
+class TokenDTO:
+    access_token: str
+    refresh_token: str
+    expires_in: int
+    token_type: str = "bearer"

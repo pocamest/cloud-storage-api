@@ -3,7 +3,7 @@ from fastapi import APIRouter
 from app.auth.dependencies import CurrentUserDep
 from app.users.dependencies import UserServiceDep
 from app.users.models import User
-from app.users.schemes import UserCreate, UserRead
+from app.users.schemas import UserCreate, UserRead
 
 router = APIRouter(prefix="/users", tags=["users"])
 

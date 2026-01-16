@@ -4,7 +4,7 @@ from app.core.security import hash_password, verify_password
 from app.users.exceptions import UserAlreadyExistsError, UserNotFoundError
 from app.users.models import User
 from app.users.repositories import UserRepository
-from app.users.schemes import UserCreate
+from app.users.schemas import UserCreate
 
 
 class UserService:

@@ -4,7 +4,7 @@ from typing import Any, cast
 
 import jwt
 
-from app.auth.dtos import AuthDTO
+from app.auth.dtos import AuthDTO, TokenDTO
 from app.auth.exceptions import (
     InvalidCredentialsError,
     TokenExpiredError,
@@ -12,10 +12,10 @@ from app.auth.exceptions import (
 )
 from app.auth.repositories import TokenRepository
 from app.auth.schemas import AuthCreate
-from app.auth.types import JWTPayload
+from app.auth.types import JWTPayload, TokenType
 from app.users.exceptions import UserNotFoundError
 from app.users.models import User
-from app.users.schemes import UserCreate
+from app.users.schemas import UserCreate
 from app.users.services import UserService
 
 
@@ -31,15 +31,15 @@ class TokenService:
         self.token_repo = token_repo
         self.secret_key = secret_key
         self.algorithm = algorithm
-        self.access_token_exp_minutes = access_token_exp_minutes
-        self.refresh_token_exp_days = refresh_token_exp_days
+        self.access_token_exp_seconds = access_token_exp_minutes * 60
+        self.refresh_token_exp_seconds = refresh_token_exp_days * 86400
 
     def create_access_token(self, user_id: int) -> str:
         now = datetime.now(UTC)
-        exp = now + timedelta(minutes=(self.access_token_exp_minutes))
+        exp = now + timedelta(seconds=(self.access_token_exp_seconds))
         payload: JWTPayload = {
             "sub": str(user_id),
-            "type": "access",
+            "type": TokenType.ACCESS,
             "exp": exp,
             "iat": now,
         }
@@ -52,20 +52,17 @@ class TokenService:
     async def create_refresh_token(self, user_id: int) -> str:
         now = datetime.now(UTC)
         jti = str(uuid.uuid4())
-        delta = timedelta(days=(self.refresh_token_exp_days))
-        exp = now + delta
+        exp = now + timedelta(seconds=(self.refresh_token_exp_seconds))
         payload: JWTPayload = {
             "sub": str(user_id),
-            "type": "refresh",
+            "type": TokenType.REFRESH,
             "jti": jti,
             "exp": exp,
             "iat": now,
         }
 
-        exp_seconds = int(delta.total_seconds())
-
         await self.token_repo.save_refresh_token(
-            user_id=user_id, jti=jti, exp_seconds=exp_seconds
+            user_id=user_id, jti=jti, exp_seconds=self.refresh_token_exp_seconds
         )
 
         return jwt.encode(
@@ -87,6 +84,18 @@ class TokenService:
 
         return payload
 
+    async def get_user_id_from_refresh_token(self, payload: JWTPayload) -> int:
+        if payload["type"] != TokenType.REFRESH:
+            raise TokenInvalidError(detail="Expected only refresh token")
+
+        jti = payload["jti"]
+        user_id = await self.token_repo.find_user_id(jti)
+
+        if user_id is None:
+            raise TokenExpiredError()
+
+        return int(user_id)
+
 
 class AuthService:
     def __init__(self, user_service: UserService, token_service: TokenService):
@@ -98,12 +107,10 @@ class AuthService:
         access_token = self.token_service.create_access_token(user_id)
         refresh_token = await self.token_service.create_refresh_token(user_id)
 
-        expires_in = self.token_service.access_token_exp_minutes * 60
-
         return AuthDTO(
             access_token=access_token,
             refresh_token=refresh_token,
-            expires_in=expires_in,
+            expires_in=self.token_service.access_token_exp_seconds,
             user=user,
         )
 
@@ -131,3 +138,15 @@ class AuthService:
             raise TokenInvalidError() from e
 
         return user
+
+    async def refresh(self, refresh_token: str) -> TokenDTO:
+        payload = self.token_service.verify_token(refresh_token)
+        user_id = await self.token_service.get_user_id_from_refresh_token(payload)
+
+        access_token = self.token_service.create_access_token(user_id)
+
+        return TokenDTO(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=self.token_service.access_token_exp_seconds,
+        )

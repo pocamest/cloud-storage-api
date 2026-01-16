@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr
 
-from app.users.schemes import UserRead
+from app.users.schemas import UserRead
 
 
 class AuthCreate(BaseModel):

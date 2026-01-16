@@ -13,3 +13,8 @@ class TokenRepository:
     ) -> None:
         key = self._get_refresh_token_key(jti)
         await self.redis_client.set(key, user_id, ex=exp_seconds)
+
+    async def find_user_id(self, jti: str) -> str | None:
+        key = self._get_refresh_token_key(jti)
+        result: str | None = await self.redis_client.get(key)
+        return result
