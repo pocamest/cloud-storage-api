@@ -18,3 +18,7 @@ class TokenRepository:
         key = self._get_refresh_token_key(jti)
         result: str | None = await self.redis_client.get(key)
         return result
+
+    async def delete_refresh_token(self, jti: str) -> None:
+        key = self._get_refresh_token_key(jti)
+        await self.redis_client.delete(key)

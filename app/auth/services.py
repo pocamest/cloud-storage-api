@@ -96,6 +96,14 @@ class TokenService:
 
         return int(user_id)
 
+    async def revoke_refresh_token(self, payload: JWTPayload) -> None:
+        if payload["type"] != TokenType.REFRESH:
+            raise TokenInvalidError(detail="Expected only refresh token")
+
+        jti = payload["jti"]
+
+        await self.token_repo.delete_refresh_token(jti)
+
 
 class AuthService:
     def __init__(self, user_service: UserService, token_service: TokenService):
@@ -150,3 +158,7 @@ class AuthService:
             refresh_token=refresh_token,
             expires_in=self.token_service.access_token_exp_seconds,
         )
+
+    async def logout(self, refresh_token: str) -> None:
+        payload = self.token_service.verify_token(refresh_token)
+        await self.token_service.revoke_refresh_token(payload)
