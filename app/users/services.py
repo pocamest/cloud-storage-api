@@ -1,14 +1,10 @@
-import logging
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import hash_password
-from app.users.exceptions import UserAlreadyExistsError
+from app.core.security import hash_password, verify_password
+from app.users.exceptions import UserAlreadyExistsError, UserNotFoundError
 from app.users.models import User
 from app.users.repositories import UserRepository
-from app.users.schemes import UserCreate
-
-logger = logging.getLogger(__name__)
+from app.users.schemas import UserCreate
 
 
 class UserService:
@@ -29,3 +25,22 @@ class UserService:
         await self.session.refresh(created_user)
 
         return created_user
+
+    async def find_by_credentials(self, email: str, password: str) -> User | None:
+        user = await self.user_repo.find_by_email(email)
+
+        if user is None:
+            return None
+
+        if not verify_password(raw_password=password, password_hash=user.password_hash):
+            return None
+
+        return user
+
+    async def get_by_id(self, id: int) -> User:
+        user = await self.user_repo.find_by_id(id)
+
+        if user is None:
+            raise UserNotFoundError()
+
+        return user

@@ -16,3 +16,6 @@ class UserRepository:
         stmt = select(User).where(User.email == email)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def find_by_id(self, id: int) -> User | None:
+        return await self.session.get(User, id)
