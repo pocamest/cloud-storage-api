@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from app.core.exceptions import AppError
@@ -14,7 +14,10 @@ def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
 
 def internal_server_error_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.error(f"Error at {request.url}", exc_info=exc)
-    return JSONResponse(content={"detail": "Internal server error"}, status_code=500)
+    return JSONResponse(
+        content={"detail": "Internal server error"},
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
 
 
 def register_exceptions_handler(app: FastAPI) -> None:
