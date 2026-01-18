@@ -34,7 +34,7 @@ class TokenService:
         self.access_token_exp_seconds = access_token_exp_minutes * 60
         self.refresh_token_exp_seconds = refresh_token_exp_days * 86400
 
-    def create_access_token(self, user_id: int) -> str:
+    def create_access_token(self, user_id: uuid.UUID) -> str:
         now = datetime.now(UTC)
         exp = now + timedelta(seconds=(self.access_token_exp_seconds))
         payload: JWTPayload = {
@@ -49,7 +49,7 @@ class TokenService:
             algorithm=self.algorithm,
         )
 
-    async def create_refresh_token(self, user_id: int) -> str:
+    async def create_refresh_token(self, user_id: uuid.UUID) -> str:
         now = datetime.now(UTC)
         jti = str(uuid.uuid4())
         exp = now + timedelta(seconds=(self.refresh_token_exp_seconds))
@@ -84,7 +84,7 @@ class TokenService:
 
         return payload
 
-    async def get_user_id_from_refresh_token(self, payload: JWTPayload) -> int:
+    async def get_user_id_from_refresh_token(self, payload: JWTPayload) -> uuid.UUID:
         if payload["type"] != TokenType.REFRESH:
             raise TokenInvalidError(detail="Expected only refresh token")
 
@@ -94,7 +94,7 @@ class TokenService:
         if user_id is None:
             raise TokenExpiredError()
 
-        return int(user_id)
+        return uuid.UUID(user_id)
 
     async def revoke_refresh_token(self, payload: JWTPayload) -> None:
         if payload["type"] != TokenType.REFRESH:
@@ -138,7 +138,7 @@ class AuthService:
 
     async def get_user_by_token(self, token: str) -> User:
         payload = self.token_service.verify_token(token)
-        user_id = int(payload["sub"])
+        user_id = uuid.UUID(payload["sub"])
 
         try:
             user = await self.user_service.get_by_id(user_id)

@@ -1,4 +1,6 @@
-from sqlalchemy import CheckConstraint, String
+import uuid
+
+from sqlalchemy import UUID, CheckConstraint, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -10,7 +12,9 @@ class User(Base):
         CheckConstraint("email = LOWER(email)", name="email_lowercase_check"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
 
