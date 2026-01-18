@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password, verify_password
@@ -37,7 +39,7 @@ class UserService:
 
         return user
 
-    async def get_by_id(self, id: int) -> User:
+    async def get_by_id(self, id: uuid.UUID) -> User:
         user = await self.user_repo.find_by_id(id)
 
         if user is None:

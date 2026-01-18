@@ -1,3 +1,5 @@
+import uuid
+
 from redis.asyncio import Redis
 
 
@@ -9,10 +11,10 @@ class TokenRepository:
         return f"refresh_token:{jti}"
 
     async def save_refresh_token(
-        self, user_id: int, jti: str, exp_seconds: int
+        self, user_id: uuid.UUID, jti: str, exp_seconds: int
     ) -> None:
         key = self._get_refresh_token_key(jti)
-        await self.redis_client.set(key, user_id, ex=exp_seconds)
+        await self.redis_client.set(key, str(user_id), ex=exp_seconds)
 
     async def find_user_id(self, jti: str) -> str | None:
         key = self._get_refresh_token_key(jti)
