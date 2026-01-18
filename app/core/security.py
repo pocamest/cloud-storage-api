@@ -1,11 +1,11 @@
-from passlib.context import CryptContext
+from pwdlib import PasswordHash
 
-_password_context = CryptContext(schemes=["pbkdf2_sha256"])
+_password_hash = PasswordHash.recommended()
 
 
 def hash_password(password: str) -> str:
-    return _password_context.hash(secret=password)
+    return _password_hash.hash(password)
 
 
 def verify_password(raw_password: str, password_hash: str) -> bool:
-    return _password_context.verify(secret=raw_password, hash=password_hash)
+    return _password_hash.verify(raw_password, password_hash)
