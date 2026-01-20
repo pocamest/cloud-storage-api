@@ -1,4 +1,3 @@
-from datetime import datetime
 from enum import StrEnum
 from typing import NotRequired, TypedDict
 
@@ -6,8 +5,8 @@ from typing import NotRequired, TypedDict
 class JWTPayload(TypedDict):
     sub: str
     type: str
-    exp: datetime
-    iat: datetime
+    exp: int
+    iat: int
     jti: NotRequired[str]
 
 
