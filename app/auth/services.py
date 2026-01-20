@@ -34,44 +34,7 @@ class TokenService:
         self.access_token_exp_seconds = access_token_exp_minutes * 60
         self.refresh_token_exp_seconds = refresh_token_exp_days * 86400
 
-    def create_access_token(self, user_id: uuid.UUID) -> str:
-        now = datetime.now(UTC)
-        exp = now + timedelta(seconds=(self.access_token_exp_seconds))
-        payload: JWTPayload = {
-            "sub": str(user_id),
-            "type": TokenType.ACCESS,
-            "exp": exp,
-            "iat": now,
-        }
-        return jwt.encode(
-            payload=cast(dict[str, Any], payload),
-            key=self.secret_key,
-            algorithm=self.algorithm,
-        )
-
-    async def create_refresh_token(self, user_id: uuid.UUID) -> str:
-        now = datetime.now(UTC)
-        jti = str(uuid.uuid4())
-        exp = now + timedelta(seconds=(self.refresh_token_exp_seconds))
-        payload: JWTPayload = {
-            "sub": str(user_id),
-            "type": TokenType.REFRESH,
-            "jti": jti,
-            "exp": exp,
-            "iat": now,
-        }
-
-        await self.token_repo.save_refresh_token(
-            user_id=user_id, jti=jti, exp_seconds=self.refresh_token_exp_seconds
-        )
-
-        return jwt.encode(
-            payload=cast(dict[str, Any], payload),
-            key=self.secret_key,
-            algorithm=self.algorithm,
-        )
-
-    def verify_token(self, token: str) -> JWTPayload:
+    def _decode_token(self, token: str) -> JWTPayload:
         try:
             payload: JWTPayload = jwt.decode(
                 jwt=token, key=self.secret_key, algorithms=[self.algorithm]
@@ -84,25 +47,79 @@ class TokenService:
 
         return payload
 
-    async def get_user_id_from_refresh_token(self, payload: JWTPayload) -> uuid.UUID:
+    def create_access_token(self, user_id: uuid.UUID) -> str:
+        now = datetime.now(UTC)
+        exp = now + timedelta(seconds=(self.access_token_exp_seconds))
+        payload: JWTPayload = {
+            "sub": str(user_id),
+            "type": TokenType.ACCESS,
+            "exp": int(exp.timestamp()),
+            "iat": int(now.timestamp()),
+        }
+        return jwt.encode(
+            payload=cast(dict[str, Any], payload),
+            key=self.secret_key,
+            algorithm=self.algorithm,
+        )
+
+    async def create_refresh_token(self, user_id: uuid.UUID) -> str:
+        now = datetime.now(UTC)
+        jti = str(uuid.uuid4())
+        exp = now + timedelta(seconds=(self.refresh_token_exp_seconds))
+        sub = str(user_id)
+        payload: JWTPayload = {
+            "sub": sub,
+            "type": TokenType.REFRESH,
+            "jti": jti,
+            "exp": int(exp.timestamp()),
+            "iat": int(now.timestamp()),
+        }
+
+        await self.token_repo.save(
+            token_type=TokenType.REFRESH,
+            token_id=jti,
+            value=sub,
+            exp_seconds=self.refresh_token_exp_seconds,
+        )
+
+        return jwt.encode(
+            payload=cast(dict[str, Any], payload),
+            key=self.secret_key,
+            algorithm=self.algorithm,
+        )
+
+    def verify_access_token(self, token: str) -> uuid.UUID:
+        payload = self._decode_token(token)
+
+        if payload["type"] != TokenType.ACCESS:
+            raise TokenInvalidError(detail="Expected only access token")
+
+        user_id = uuid.UUID(payload["sub"])
+
+        return user_id
+
+    async def verify_refresh_token(self, token: str) -> uuid.UUID:
+        payload = self._decode_token(token)
+
         if payload["type"] != TokenType.REFRESH:
             raise TokenInvalidError(detail="Expected only refresh token")
 
         jti = payload["jti"]
-        user_id = await self.token_repo.find_user_id(jti)
-
-        if user_id is None:
+        if not await self.token_repo.exists(token_type=TokenType.REFRESH, token_id=jti):
             raise TokenExpiredError()
 
-        return uuid.UUID(user_id)
+        user_id = uuid.UUID(payload["sub"])
 
-    async def revoke_refresh_token(self, payload: JWTPayload) -> None:
+        return user_id
+
+    async def revoke_refresh_token(self, token: str) -> None:
+        payload = self._decode_token(token)
         if payload["type"] != TokenType.REFRESH:
             raise TokenInvalidError(detail="Expected only refresh token")
 
         jti = payload["jti"]
 
-        await self.token_repo.delete_refresh_token(jti)
+        await self.token_repo.delete(token_type=TokenType.REFRESH, token_id=jti)
 
 
 class AuthService:
@@ -136,9 +153,8 @@ class AuthService:
         user = await self.user_service.create_user(user_data)
         return await self._create_tokens(user)
 
-    async def get_user_by_token(self, token: str) -> User:
-        payload = self.token_service.verify_token(token)
-        user_id = uuid.UUID(payload["sub"])
+    async def get_user_from_access_token(self, token: str) -> User:
+        user_id = self.token_service.verify_access_token(token)
 
         try:
             user = await self.user_service.get_by_id(user_id)
@@ -148,8 +164,7 @@ class AuthService:
         return user
 
     async def refresh(self, refresh_token: str) -> TokenDTO:
-        payload = self.token_service.verify_token(refresh_token)
-        user_id = await self.token_service.get_user_id_from_refresh_token(payload)
+        user_id = await self.token_service.verify_refresh_token(refresh_token)
 
         access_token = self.token_service.create_access_token(user_id)
 
@@ -160,5 +175,4 @@ class AuthService:
         )
 
     async def logout(self, refresh_token: str) -> None:
-        payload = self.token_service.verify_token(refresh_token)
-        await self.token_service.revoke_refresh_token(payload)
+        await self.token_service.revoke_refresh_token(refresh_token)

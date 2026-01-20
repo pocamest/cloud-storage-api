@@ -1,26 +1,26 @@
-import uuid
-
 from redis.asyncio import Redis
+
+from app.auth.types import TokenType
 
 
 class TokenRepository:
     def __init__(self, redis_client: Redis):
         self.redis_client = redis_client
 
-    def _get_refresh_token_key(self, jti: str) -> str:
-        return f"refresh_token:{jti}"
+    def _create_key(self, token_type: TokenType, token_id: str) -> str:
+        return f"{token_type}:{token_id}"
 
-    async def save_refresh_token(
-        self, user_id: uuid.UUID, jti: str, exp_seconds: int
+    async def save(
+        self, token_type: TokenType, token_id: str, value: str, exp_seconds: int
     ) -> None:
-        key = self._get_refresh_token_key(jti)
-        await self.redis_client.set(key, str(user_id), ex=exp_seconds)
+        key = self._create_key(token_type, token_id)
+        await self.redis_client.set(key, value, ex=exp_seconds)
 
-    async def find_user_id(self, jti: str) -> str | None:
-        key = self._get_refresh_token_key(jti)
-        result: str | None = await self.redis_client.get(key)
-        return result
+    async def exists(self, token_type: TokenType, token_id: str) -> bool:
+        key = self._create_key(token_type, token_id)
+        result: int = await self.redis_client.exists(key)
+        return result > 0
 
-    async def delete_refresh_token(self, jti: str) -> None:
-        key = self._get_refresh_token_key(jti)
+    async def delete(self, token_type: TokenType, token_id: str) -> None:
+        key = self._create_key(token_type, token_id)
         await self.redis_client.delete(key)
