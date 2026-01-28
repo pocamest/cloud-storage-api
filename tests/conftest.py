@@ -1,4 +1,4 @@
-from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
+from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
 
 import pytest
@@ -15,11 +15,15 @@ from sqlalchemy.ext.asyncio import (
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import AsyncRedisContainer
 
+from app.auth.repositories import TokenRepository
+from app.auth.services import TokenService
+from app.core.config import settings
 from app.core.database import Base
 from app.core.dependencies import get_redis_client, get_session
 from app.core.security import hash_password
 from app.main import app
 from app.users.models import User  # noqa
+from tests.types import CreateUserCallable
 
 POSTGRES_IMAGE = "postgres:18-alpine"
 REDIS_IMAGE = "redis:8-alpine"
@@ -104,12 +108,9 @@ def override_dependencies(
 @pytest.fixture
 async def client(override_dependencies: None) -> AsyncGenerator[AsyncClient]:
     async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
+        transport=ASGITransport(app=app), base_url="http://test/api/v1"
     ) as ac:
         yield ac
-
-
-CreateUserCallable = Callable[[str, str], Awaitable[User]]
 
 
 @pytest.fixture
@@ -128,3 +129,19 @@ async def create_user(
         return user
 
     return _create_user
+
+
+@pytest.fixture
+def token_repo(redis_client: Redis) -> TokenRepository:
+    return TokenRepository(redis_client)
+
+
+@pytest.fixture
+def token_service(token_repo: TokenRepository) -> TokenService:
+    return TokenService(
+        token_repo=token_repo,
+        secret_key=settings.token_secret_key,
+        algorithm=settings.token_algorithm,
+        access_token_exp_minutes=settings.access_token_exp_minutes,
+        refresh_token_exp_days=settings.refresh_token_exp_days,
+    )
