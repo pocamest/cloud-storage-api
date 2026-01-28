@@ -1,16 +1,13 @@
 import uuid
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+from app.core.types import NormalizedEmail
 
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    email: NormalizedEmail
     password: str = Field(min_length=8, max_length=64)
-
-    @field_validator("email")
-    @classmethod
-    def normalize(cls, v: EmailStr) -> EmailStr:
-        return v.lower()
 
 
 class UserRead(BaseModel):

@@ -1,10 +1,11 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
+from app.core.types import NormalizedEmail
 from app.users.schemas import UserRead
 
 
 class AuthCreate(BaseModel):
-    email: EmailStr
+    email: NormalizedEmail
     password: str
 
 
