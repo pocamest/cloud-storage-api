@@ -12,7 +12,7 @@ from app.auth.exceptions import (
     TokenInvalidTypeError,
 )
 from app.auth.repositories import TokenRepository
-from app.auth.schemas import AuthCreate
+from app.auth.schemas import LoginRequest
 from app.auth.types import JWTPayload, TokenType
 from app.users.exceptions import UserNotFoundError
 from app.users.models import User
@@ -140,7 +140,7 @@ class AuthService:
             user=user,
         )
 
-    async def login(self, auth_data: AuthCreate) -> AuthDTO:
+    async def login(self, auth_data: LoginRequest) -> AuthDTO:
         user = await self.user_service.find_by_credentials(
             email=auth_data.email, password=auth_data.password
         )
