@@ -9,6 +9,7 @@ from app.auth.exceptions import (
     InvalidCredentialsError,
     TokenExpiredError,
     TokenInvalidError,
+    TokenInvalidTypeError,
 )
 from app.auth.repositories import TokenRepository
 from app.auth.schemas import AuthCreate
@@ -92,7 +93,7 @@ class TokenService:
         payload = self._decode_token(token)
 
         if payload["type"] != TokenType.ACCESS:
-            raise TokenInvalidError(detail="Expected only access token")
+            raise TokenInvalidTypeError()
 
         user_id = uuid.UUID(payload["sub"])
 
@@ -102,7 +103,7 @@ class TokenService:
         payload = self._decode_token(token)
 
         if payload["type"] != TokenType.REFRESH:
-            raise TokenInvalidError(detail="Expected only refresh token")
+            raise TokenInvalidTypeError()
 
         jti = payload["jti"]
         if not await self.token_repo.exists(token_type=TokenType.REFRESH, token_id=jti):
@@ -115,7 +116,7 @@ class TokenService:
     async def revoke_refresh_token(self, token: str) -> None:
         payload = self._decode_token(token)
         if payload["type"] != TokenType.REFRESH:
-            raise TokenInvalidError(detail="Expected only refresh token")
+            raise TokenInvalidTypeError()
 
         jti = payload["jti"]
 
