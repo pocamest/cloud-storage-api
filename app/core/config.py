@@ -7,22 +7,22 @@ class Settings(BaseSettings):
         env_file=".env", env_ignore_empty=True, extra="ignore", case_sensitive=False
     )
 
-    postgres_user: str
-    postgres_password: str
-    postgres_db: str
-    postgres_host: str
-    postgres_port: int
+    postgres_user: str = "app"
+    postgres_password: str = "change_me"
+    postgres_db: str = "cloud_storage"
+    postgres_host: str = "localhost"
+    postgres_port: int = 5432
 
-    redis_password: str
-    redis_port: int
-    redis_host: str
+    redis_password: str = ""
+    redis_port: int = 6379
+    redis_host: str = "localhost"
 
-    log_level: str
+    log_level: str = "INFO"
 
     token_secret_key: str
-    token_algorithm: str
-    access_token_exp_minutes: int
-    refresh_token_exp_days: int
+    token_algorithm: str = "HS256"
+    access_token_exp_minutes: int = 15
+    refresh_token_exp_days: int = 30
 
     @property
     def database_url(self) -> str:

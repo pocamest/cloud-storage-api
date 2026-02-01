@@ -1,0 +1,32 @@
+name: CI
+
+on:
+    push:
+        branches: [main]
+
+    pull_request:
+        branches: [main]
+
+jobs:
+    checks:
+        env:
+            TOKEN_SECRET_KEY: placeholder
+        runs-on: ubuntu-latest
+
+        steps:
+          - name: Checkout code
+            uses: actions/checkout@v6
+
+          - name: Install uv
+            uses: astral-sh/setup-uv@v7
+            with:
+                enable-cache: true
+
+          - name: Install dependencies
+            run: uv sync --dev
+
+          - name: Run pre-commit
+            run: uv run pre-commit run --all-files --show-diff-on-failure
+
+          - name: Run tests
+            run: uv run pytest
