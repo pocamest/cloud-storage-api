@@ -8,7 +8,9 @@ on:
         branches: [main]
 
 jobs:
-    build-lint-test:
+    checks:
+        env:
+            TOKEN_SECRET_KEY: placeholder
         runs-on: ubuntu-latest
 
         steps:
