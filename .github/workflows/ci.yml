@@ -11,6 +11,9 @@ jobs:
     checks:
         env:
             TOKEN_SECRET_KEY: placeholder
+            S3_ACCESS_KEY: admin
+            S3_SECRET_KEY: placeholder
+
         runs-on: ubuntu-latest
 
         steps:
