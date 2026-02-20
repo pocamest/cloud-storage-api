@@ -17,6 +17,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from app.core.config import settings
 from app.core.database import Base
 from app.users.models import User
+from app.storage.models import StorageItem
 
 
 # this is the Alembic Config object, which provides
