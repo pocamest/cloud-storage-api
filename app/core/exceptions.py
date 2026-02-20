@@ -5,6 +5,7 @@ from fastapi import status
 
 class ErrorCode(StrEnum):
     INTERNAL_SERVER_ERROR = "INTERNAL_SERVER_ERROR"
+    BAD_REQUEST = "BAD_REQUEST"
 
     USER_ALREADY_EXISTS = "USER_ALREADY_EXISTS"
     USER_NOT_FOUND = "USER_NOT_FOUND"
@@ -20,9 +21,15 @@ class ErrorCode(StrEnum):
 
 
 class AppError(Exception):
-    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    detail = "Internal server error"
-    error_code = ErrorCode.INTERNAL_SERVER_ERROR
+    """
+    Базовый класс для всех ожидаемых ошибок.
+
+    Все непредвиденные баги возвращаются клиенту в виде 500 ошибки.
+    """
+
+    status_code = status.HTTP_400_BAD_REQUEST
+    detail = "Application error"
+    error_code = ErrorCode.BAD_REQUEST
 
     def __init__(self, detail: str | None = None, error_code: ErrorCode | None = None):
         if detail:
