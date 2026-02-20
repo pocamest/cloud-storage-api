@@ -22,7 +22,8 @@ from app.core.database import Base
 from app.core.dependencies import get_redis_client, get_session
 from app.core.security import hash_password
 from app.main import app
-from app.users.models import User  # noqa
+from app.storage.models import StorageItem  # noqa
+from app.users.models import User
 from tests.types import CreateUserCallable
 
 POSTGRES_IMAGE = "postgres:18-alpine"

@@ -1,0 +1,39 @@
+import uuid
+from typing import TypeVar
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.storage.models import StorageItem
+
+T = TypeVar("T", bound=StorageItem)
+
+
+class StorageItemRepository:
+    def __init__(self, session: AsyncSession):
+        self._session = session
+
+    def add(self, storage_item: T) -> T:
+        self._session.add(storage_item)
+        return storage_item
+
+    async def find_by_id_and_owner(
+        self, id: uuid.UUID, owner_id: uuid.UUID
+    ) -> StorageItem | None:
+        stmt = select(StorageItem).where(
+            StorageItem.id == id, StorageItem.owner_id == owner_id
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    # TODO: это нормальное название для репозитория или можно лучше?
+    async def name_exists(
+        self, name: str, owner_id: uuid.UUID, parent_id: uuid.UUID | None
+    ) -> bool:
+        stmt = select(StorageItem.id).where(
+            StorageItem.name == name,
+            StorageItem.owner_id == owner_id,
+            StorageItem.parent_id == parent_id,
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none() is not None
