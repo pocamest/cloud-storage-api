@@ -26,7 +26,6 @@ class StorageItemRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
-    # TODO: это нормальное название для репозитория или можно лучше?
     async def name_exists(
         self, name: str, owner_id: uuid.UUID, parent_id: uuid.UUID | None
     ) -> bool:
