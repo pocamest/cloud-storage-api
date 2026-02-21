@@ -8,7 +8,7 @@ from app.users.schemas import UserCreate, UserRead
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.post("/", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def create_user(user_service: UserServiceDep, user_data: UserCreate) -> User:
     user = await user_service.create_user(user_data)
     return user
