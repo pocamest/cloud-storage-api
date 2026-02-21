@@ -5,7 +5,7 @@ API для облачного хранилища. Спроектирован в 
 ## Стэк:
 
 - **Core:** Python, FastAPI, Uvicorn
-- **Databases:** PostgreSQL, Redis
+- **Databases:** PostgreSQL 15+, Redis
 -  **ORM & Migrations:** SQLAlchemy, Alembic
 - **Storage:** MinIO, aiobotocore
 - **Dev Tools:** Docker Compose, uv, ruff, mypy, pre-commit
