@@ -19,7 +19,7 @@ class UserService:
             raise UserAlreadyExistsError()
 
         password_hash = hash_password(user_data.password)
-        created_user = self._user_repo.create(
+        created_user = self._user_repo.add(
             User(email=user_data.email, password_hash=password_hash)
         )
 
