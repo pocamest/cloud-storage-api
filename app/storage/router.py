@@ -23,3 +23,10 @@ async def upload(
     return await storage_service.upload_file(
         filename=file.filename, parent_id=parent_id, content=content, user=user
     )
+
+
+@router.get("/{file_id}", response_model=FileRead)
+async def get_file(
+    file_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
+) -> File:
+    return await storage_service.get_file(id=file_id, owner=user)

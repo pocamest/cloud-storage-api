@@ -7,6 +7,12 @@ class StorageError(AppError):
     pass
 
 
+class FileNotFoundError(StorageError):
+    status_code = status.HTTP_404_NOT_FOUND
+    detail = "File not found"
+    error_code = ErrorCode.FILE_NOT_FOUND
+
+
 class FolderNotFoundError(StorageError):
     status_code = status.HTTP_404_NOT_FOUND
     detail = "Folder not found"

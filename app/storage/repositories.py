@@ -18,9 +18,9 @@ class StorageItemRepository:
         return storage_item
 
     async def find_by_id_and_owner(
-        self, id: uuid.UUID, owner_id: uuid.UUID
-    ) -> StorageItem | None:
-        stmt = select(StorageItem).where(
+        self, id: uuid.UUID, owner_id: uuid.UUID, model_class: type[T]
+    ) -> T | None:
+        stmt = select(model_class).where(
             StorageItem.id == id, StorageItem.owner_id == owner_id
         )
         result = await self._session.execute(stmt)
