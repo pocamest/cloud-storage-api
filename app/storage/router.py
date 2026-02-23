@@ -21,7 +21,7 @@ async def upload(
 ) -> File:
     content = await file.read()
     return await storage_service.upload_file(
-        filename=file.filename, parent_id=parent_id, content=content, user=user
+        filename=file.filename, parent_id=parent_id, content=content, owner=user
     )
 
 
