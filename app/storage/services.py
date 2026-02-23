@@ -9,7 +9,6 @@ from app.storage.exceptions import (
     FileNotFoundError,
     FolderNotFoundError,
     NameAlreadyTakenError,
-    ParentIsNotFolderError,
 )
 from app.storage.models import UNIQUE_NAME_WITHIN_PARENT, File, Folder
 from app.storage.repositories import StorageItemRepository
@@ -28,8 +27,7 @@ class StorageService:
         self._s3_adapter = s3_adapter
         self._s3_files_prefix = settings.s3_files_prefix
 
-    # TODO: переосмыслить этот чек и удалить ParentIsNotFolderError
-    async def _check_parent_is_folder(
+    async def _check_parent_folder_exists(
         self, parent_id: uuid.UUID | None, owner_id: uuid.UUID
     ) -> None:
         if parent_id is None:
@@ -39,8 +37,6 @@ class StorageService:
         )
         if parent is None:
             raise FolderNotFoundError()
-        if not isinstance(parent, Folder):
-            raise ParentIsNotFolderError()
 
     # TODO: нужно разобраться с ограничением на размер файла
     async def upload_file(
@@ -48,20 +44,20 @@ class StorageService:
         filename: str | None,
         parent_id: uuid.UUID | None,
         content: bytes,
-        user: User,
+        owner: User,
     ) -> File:
-        await self._check_parent_is_folder(parent_id=parent_id, owner_id=user.id)
+        await self._check_parent_folder_exists(parent_id=parent_id, owner_id=owner.id)
         name = filename or str(uuid.uuid4())
         # name_exists просто оптимизация, чтобы при дублирующем имени не всегда
         # приходилось записывать файл в s3,
         # но в основном мы полагаемся на ограничение бд UNIQUE_NAME_WITHIN_PARENT
         name_exists_in_folder = await self._storage_item_repo.name_exists(
-            name=name, owner_id=user.id, parent_id=parent_id
+            name=name, owner_id=owner.id, parent_id=parent_id
         )
         if name_exists_in_folder:
             raise NameAlreadyTakenError()
         file_id = uuid.uuid4()
-        s3_key = f"{self._s3_files_prefix}/{user.id}/{file_id}"
+        s3_key = f"{self._s3_files_prefix}/{owner.id}/{file_id}"
         await self._s3_adapter.upload(key=s3_key, content=content)
 
         try:
@@ -69,7 +65,7 @@ class StorageService:
                 File(
                     id=file_id,
                     name=name,
-                    owner_id=user.id,
+                    owner_id=owner.id,
                     parent_id=parent_id,
                     size=len(content),
                     s3_key=s3_key,

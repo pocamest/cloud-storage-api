@@ -19,12 +19,6 @@ class FolderNotFoundError(StorageError):
     error_code = ErrorCode.FOLDER_NOT_FOUND
 
 
-class ParentIsNotFolderError(StorageError):
-    status_code = status.HTTP_400_BAD_REQUEST
-    detail = "Parent is not a folder"
-    error_code = ErrorCode.PARENT_IS_NOT_FOLDER
-
-
 class NameAlreadyTakenError(StorageError):
     status_code = status.HTTP_409_CONFLICT
     detail = "The name is already taken"
