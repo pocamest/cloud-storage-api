@@ -32,6 +32,7 @@ class StorageItem(Base):
             "kind != 'file' OR s3_key IS NOT NULL",
             name="check_s3_key_not_null_for_file",
         ),
+        CheckConstraint("parent_id != id", name="check_parent_is_not_self"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
