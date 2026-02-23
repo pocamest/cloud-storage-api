@@ -98,3 +98,17 @@ class StorageService:
 
         await self._session.refresh(file)
         return file
+
+    async def delete_file(self, id: uuid.UUID, owner: User) -> None:
+        file = await self._storage_item_repo.find_by_id_and_owner(
+            id=id, owner_id=owner.id, model_class=File
+        )
+        if file is None:
+            raise FileNotFoundError()
+
+        s3_key = file.s3_key
+
+        await self._storage_item_repo.delete(file)
+        await self._session.commit()
+
+        await self._s3_adapter.delete(s3_key)

@@ -30,3 +30,10 @@ async def get_file(
     file_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
 ) -> File:
     return await storage_service.get_file(id=file_id, owner=user)
+
+
+@router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_file(
+    file_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
+) -> None:
+    await storage_service.delete_file(id=file_id, owner=user)

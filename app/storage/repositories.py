@@ -36,3 +36,6 @@ class StorageItemRepository:
         )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none() is not None
+
+    async def delete(self, storage_item: T) -> None:
+        await self._session.delete(storage_item)
