@@ -6,22 +6,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.storage.models import StorageItem
 
-T = TypeVar("T", bound=StorageItem)
+StorageItemT = TypeVar("StorageItemT", bound=StorageItem)
 
 
 class StorageItemRepository:
     def __init__(self, session: AsyncSession):
         self._session = session
 
-    def add(self, storage_item: T) -> T:
+    def add(self, storage_item: StorageItemT) -> StorageItemT:
         self._session.add(storage_item)
         return storage_item
 
     async def find_by_id_and_owner(
-        self, id: uuid.UUID, owner_id: uuid.UUID, model_class: type[T]
-    ) -> T | None:
+        self, id: uuid.UUID, owner_id: uuid.UUID, model_class: type[StorageItemT]
+    ) -> StorageItemT | None:
         stmt = select(model_class).where(
-            StorageItem.id == id, StorageItem.owner_id == owner_id
+            model_class.id == id, model_class.owner_id == owner_id
         )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
@@ -37,5 +37,5 @@ class StorageItemRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none() is not None
 
-    async def delete(self, storage_item: T) -> None:
+    async def delete(self, storage_item: StorageItemT) -> None:
         await self._session.delete(storage_item)
