@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.storage.adapters import S3Adapter
+from app.storage.dtos import DownloadFileDTO
 from app.storage.exceptions import (
     FileNotFoundError,
     FolderNotFoundError,
@@ -112,3 +113,13 @@ class StorageService:
         await self._session.commit()
 
         await self._s3_adapter.delete(s3_key)
+
+    async def download_file(self, id: uuid.UUID, owner: User) -> DownloadFileDTO:
+        file = await self._storage_item_repo.find_by_id_and_owner(
+            id=id, owner_id=owner.id, model_class=File
+        )
+        if file is None:
+            raise FileNotFoundError()
+
+        content = await self._s3_adapter.download(key=file.s3_key)
+        return DownloadFileDTO(filename=file.name, content=content)

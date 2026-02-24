@@ -1,7 +1,9 @@
 import uuid
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import APIRouter, Form, UploadFile, status
+from fastapi.responses import Response
 
 from app.auth.dependencies import CurrentUserDep
 from app.storage.dependencies import StorageServiceDep
@@ -13,7 +15,7 @@ router = APIRouter(prefix="/files", tags=["files"])
 
 # TODO: пока загружаю весь файл, возможно переделаю на стриминг
 @router.post("/upload", response_model=FileRead, status_code=status.HTTP_201_CREATED)
-async def upload(
+async def upload_file(
     file: UploadFile,
     storage_service: StorageServiceDep,
     user: CurrentUserDep,
@@ -37,3 +39,21 @@ async def delete_file(
     file_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
 ) -> None:
     await storage_service.delete_file(id=file_id, owner=user)
+
+
+# TODO: потом переделам на стриминг
+@router.get("/download/{file_id}")
+async def download_file(
+    file_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
+) -> Response:
+    data = await storage_service.download_file(id=file_id, owner=user)
+    encode_filename = quote(data.filename)
+
+    # TODO: потом спрятать
+    return Response(
+        data.content,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encode_filename}"
+        },
+    )
