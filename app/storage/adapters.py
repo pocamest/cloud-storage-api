@@ -13,3 +13,8 @@ class S3Adapter:
 
     async def delete(self, key: str) -> None:
         await self._client.delete_object(Bucket=self._bucket, Key=key)
+
+    async def download(self, key: str) -> bytes:
+        response = await self._client.get_object(Bucket=self._bucket, Key=key)
+        async with response["Body"] as stream:
+            return await stream.read()
