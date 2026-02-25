@@ -42,7 +42,7 @@ async def delete_file(
 
 
 # TODO: потом переделам на стриминг
-@router.get("/download/{file_id}")
+@router.get("/{file_id}/download")
 async def download_file(
     file_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
 ) -> Response:
