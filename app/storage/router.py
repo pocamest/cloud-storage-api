@@ -10,11 +10,13 @@ from app.storage.dependencies import StorageServiceDep
 from app.storage.models import File
 from app.storage.schemas import FileRead
 
-router = APIRouter(prefix="/files", tags=["files"])
+router = APIRouter(tags=["storage"])
 
 
 # TODO: пока загружаю весь файл, возможно переделаю на стриминг
-@router.post("/upload", response_model=FileRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/files/upload", response_model=FileRead, status_code=status.HTTP_201_CREATED
+)
 async def upload_file(
     file: UploadFile,
     storage_service: StorageServiceDep,
@@ -27,14 +29,14 @@ async def upload_file(
     )
 
 
-@router.get("/{file_id}", response_model=FileRead)
+@router.get("/files/{file_id}", response_model=FileRead)
 async def get_file(
     file_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
 ) -> File:
     return await storage_service.get_file(id=file_id, owner=user)
 
 
-@router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/files/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_file(
     file_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
 ) -> None:
@@ -42,7 +44,7 @@ async def delete_file(
 
 
 # TODO: потом переделам на стриминг
-@router.get("/download/{file_id}")
+@router.get("/files/{file_id}/download")
 async def download_file(
     file_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
 ) -> Response:
