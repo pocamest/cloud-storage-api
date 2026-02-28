@@ -7,8 +7,8 @@ from fastapi.responses import Response
 
 from app.auth.dependencies import CurrentUserDep
 from app.storage.dependencies import StorageServiceDep
-from app.storage.models import File
-from app.storage.schemas import FileRead
+from app.storage.models import File, Folder
+from app.storage.schemas import FileRead, FolderCreate, FolderRead
 
 router = APIRouter(tags=["storage"])
 
@@ -58,4 +58,13 @@ async def download_file(
         headers={
             "Content-Disposition": f"attachment; filename*=UTF-8''{encode_filename}"
         },
+    )
+
+
+@router.post("/folders", response_model=FolderRead, status_code=status.HTTP_201_CREATED)
+async def create_folder(
+    folder_data: FolderCreate, storage_service: StorageServiceDep, user: CurrentUserDep
+) -> Folder:
+    return await storage_service.create_folder(
+        name=folder_data.name, parent_id=folder_data.parent_id, owner=user
     )
