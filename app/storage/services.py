@@ -79,8 +79,7 @@ class StorageService:
             )
 
             await self._session.commit()
-            # TODO: refresh() если в будущем добавлю поля автогенерируемые поля в бд
-            await self._session.refresh(file)
+
             return file
 
         except IntegrityError as e:
@@ -102,7 +101,6 @@ class StorageService:
         if file is None:
             raise FileNotFoundError()
 
-        await self._session.refresh(file)
         return file
 
     async def delete_file(self, id: uuid.UUID, owner: User) -> None:
@@ -144,8 +142,9 @@ class StorageService:
             )
 
             await self._session.commit()
-            await self._session.refresh(folder)
+
             return folder
+
         except IntegrityError as e:
             await self._session.rollback()
             if UNIQUE_NAME_WITHIN_PARENT in str(e.orig):
