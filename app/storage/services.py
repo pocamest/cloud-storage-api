@@ -28,7 +28,7 @@ class StorageService:
         self._s3_adapter = s3_adapter
         self._s3_files_prefix = settings.s3_files_prefix
 
-    async def _check_parent_folder_exists(
+    async def _check_parent_exists(
         self, parent_id: uuid.UUID | None, owner_id: uuid.UUID
     ) -> None:
         if parent_id is None:
@@ -39,6 +39,15 @@ class StorageService:
         if parent is None:
             raise FolderNotFoundError()
 
+    async def _check_name_not_exists_in_parent(
+        self, name: str, parent_id: uuid.UUID | None, owner_id: uuid.UUID
+    ) -> None:
+        name_exists_in_parent = await self._storage_item_repo.name_exists(
+            name=name, owner_id=owner_id, parent_id=parent_id
+        )
+        if name_exists_in_parent:
+            raise NameAlreadyTakenError()
+
     # TODO: нужно разобраться с ограничением на размер файла
     async def upload_file(
         self,
@@ -47,16 +56,12 @@ class StorageService:
         content: bytes,
         owner: User,
     ) -> File:
-        await self._check_parent_folder_exists(parent_id=parent_id, owner_id=owner.id)
+        await self._check_parent_exists(parent_id=parent_id, owner_id=owner.id)
         name = filename or str(uuid.uuid4())
-        # name_exists просто оптимизация, чтобы при дублирующем имени не всегда
-        # приходилось записывать файл в s3,
-        # но в основном мы полагаемся на ограничение бд UNIQUE_NAME_WITHIN_PARENT
-        name_exists_in_folder = await self._storage_item_repo.name_exists(
-            name=name, owner_id=owner.id, parent_id=parent_id
+        await self._check_name_not_exists_in_parent(
+            name=name, parent_id=parent_id, owner_id=owner.id
         )
-        if name_exists_in_folder:
-            raise NameAlreadyTakenError()
+
         file_id = uuid.uuid4()
         s3_key = f"{self._s3_files_prefix}/{owner.id}/{file_id}"
         await self._s3_adapter.upload(key=s3_key, content=content)
@@ -123,3 +128,26 @@ class StorageService:
 
         content = await self._s3_adapter.download(key=file.s3_key)
         return DownloadFileDTO(filename=file.name, content=content)
+
+    async def create_folder(
+        self, name: str, parent_id: uuid.UUID | None, owner: User
+    ) -> Folder:
+        await self._check_parent_exists(parent_id=parent_id, owner_id=owner.id)
+        await self._check_name_not_exists_in_parent(
+            name=name, parent_id=parent_id, owner_id=owner.id
+        )
+
+        id = uuid.uuid4()
+        try:
+            folder = self._storage_item_repo.add(
+                Folder(id=id, name=name, owner_id=owner.id, parent_id=parent_id)
+            )
+
+            await self._session.commit()
+            await self._session.refresh(folder)
+            return folder
+        except IntegrityError as e:
+            await self._session.rollback()
+            if UNIQUE_NAME_WITHIN_PARENT in str(e.orig):
+                raise NameAlreadyTakenError() from e
+            raise
