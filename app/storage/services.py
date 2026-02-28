@@ -151,3 +151,12 @@ class StorageService:
             if UNIQUE_NAME_WITHIN_PARENT in str(e.orig):
                 raise NameAlreadyTakenError() from e
             raise
+
+    async def get_folder(self, id: uuid.UUID, owner: User) -> Folder:
+        folder = await self._storage_item_repo.find_by_id_and_owner(
+            id=id, owner_id=owner.id, model_class=Folder
+        )
+        if folder is None:
+            raise FolderNotFoundError()
+
+        return folder

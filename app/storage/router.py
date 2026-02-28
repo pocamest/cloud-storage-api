@@ -68,3 +68,10 @@ async def create_folder(
     return await storage_service.create_folder(
         name=folder_data.name, parent_id=folder_data.parent_id, owner=user
     )
+
+
+@router.get("/folders/{folder_id}", response_model=FolderRead)
+async def get_folder(
+    folder_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
+) -> Folder:
+    return await storage_service.get_folder(id=folder_id, owner=user)
