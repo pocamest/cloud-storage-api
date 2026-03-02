@@ -1,6 +1,7 @@
 import uuid
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class FileRead(BaseModel):
@@ -12,13 +13,14 @@ class FileRead(BaseModel):
     parent_id: uuid.UUID | None
     size: int
 
+    kind: Literal["file"]
+
 
 class FolderCreate(BaseModel):
     name: str
     parent_id: uuid.UUID | None
 
 
-# TODO: подумать над дублированием с FileRead
 class FolderRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -26,3 +28,8 @@ class FolderRead(BaseModel):
     name: str
     owner_id: uuid.UUID
     parent_id: uuid.UUID | None
+
+    kind: Literal["folder"]
+
+
+ItemRead = Annotated[FileRead | FolderRead, Field(discriminator="kind")]
