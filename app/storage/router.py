@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Sequence
 from typing import Annotated
 from urllib.parse import quote
 
@@ -7,8 +8,8 @@ from fastapi.responses import Response
 
 from app.auth.dependencies import CurrentUserDep
 from app.storage.dependencies import StorageServiceDep
-from app.storage.models import File, Folder
-from app.storage.schemas import FileRead, FolderCreate, FolderRead
+from app.storage.models import File, Folder, StorageItem
+from app.storage.schemas import FileRead, FolderCreate, FolderRead, ItemRead
 
 router = APIRouter(tags=["storage"])
 
@@ -75,3 +76,17 @@ async def get_folder(
     folder_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
 ) -> Folder:
     return await storage_service.get_folder(id=folder_id, owner=user)
+
+
+@router.get("/folders/home/items", response_model=Sequence[ItemRead])
+async def get_home_items(
+    storage_service: StorageServiceDep, user: CurrentUserDep
+) -> Sequence[StorageItem]:
+    return await storage_service.get_home_items(owner=user)
+
+
+@router.get("/folders/{folder_id}/items", response_model=Sequence[ItemRead])
+async def get_folder_items(
+    folder_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
+) -> Sequence[StorageItem]:
+    return await storage_service.get_folder_items(id=folder_id, owner=user)

@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Sequence
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +12,7 @@ from app.storage.exceptions import (
     FolderNotFoundError,
     NameAlreadyTakenError,
 )
-from app.storage.models import UNIQUE_NAME_WITHIN_PARENT, File, Folder
+from app.storage.models import UNIQUE_NAME_WITHIN_PARENT, File, Folder, StorageItem
 from app.storage.repositories import StorageItemRepository
 from app.users.models import User
 
@@ -159,3 +160,13 @@ class StorageService:
             raise FolderNotFoundError()
 
         return folder
+
+    async def get_folder_items(
+        self, id: uuid.UUID | None, owner: User
+    ) -> Sequence[StorageItem]:
+        return await self._storage_item_repo.find_by_parent_and_owner(
+            owner_id=owner.id, parent_id=id
+        )
+
+    async def get_home_items(self, owner: User) -> Sequence[StorageItem]:
+        return await self.get_folder_items(id=None, owner=owner)

@@ -1,8 +1,10 @@
 import uuid
+from collections.abc import Sequence
 from typing import TypeVar
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import with_polymorphic
 
 from app.storage.models import StorageItem
 
@@ -39,3 +41,15 @@ class StorageItemRepository:
 
     async def delete(self, storage_item: StorageItem) -> None:
         await self._session.delete(storage_item)
+
+    async def find_by_parent_and_owner(
+        self, owner_id: uuid.UUID, parent_id: uuid.UUID | None
+    ) -> Sequence[StorageItem]:
+        # сразу загружает поля наследников, потому что lazy_load в async не работает
+        full_storage_item = with_polymorphic(StorageItem, "*")
+        stmt = select(full_storage_item).where(
+            full_storage_item.owner_id == owner_id,
+            full_storage_item.parent_id == parent_id,
+        )
+        result = await self._session.execute(stmt)
+        return result.scalars().all()
