@@ -3,6 +3,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.storage.types import StorageItemKind
+
 
 class FileRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -13,7 +15,9 @@ class FileRead(BaseModel):
     parent_id: uuid.UUID | None
     size: int
 
-    kind: Literal["file"]
+    kind: Literal[StorageItemKind.FILE]
+
+    path: str
 
 
 class FolderCreate(BaseModel):
@@ -29,7 +33,9 @@ class FolderRead(BaseModel):
     owner_id: uuid.UUID
     parent_id: uuid.UUID | None
 
-    kind: Literal["folder"]
+    kind: Literal[StorageItemKind.FOLDER]
+
+    path: str
 
 
 ItemRead = Annotated[FileRead | FolderRead, Field(discriminator="kind")]

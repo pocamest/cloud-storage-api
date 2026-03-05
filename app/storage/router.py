@@ -8,7 +8,9 @@ from fastapi.responses import Response
 
 from app.auth.dependencies import CurrentUserDep
 from app.storage.dependencies import StorageServiceDep
-from app.storage.models import File, Folder, StorageItem
+
+# from app.storage.models import File, Folder, StorageItem
+from app.storage.dtos import FileDTO, FolderDTO
 from app.storage.schemas import FileRead, FolderCreate, FolderRead, ItemRead
 
 router = APIRouter(tags=["storage"])
@@ -23,7 +25,7 @@ async def upload_file(
     storage_service: StorageServiceDep,
     user: CurrentUserDep,
     parent_id: Annotated[uuid.UUID | None, Form()] = None,
-) -> File:
+) -> FileDTO:
     content = await file.read()
     return await storage_service.upload_file(
         filename=file.filename, parent_id=parent_id, content=content, owner=user
@@ -33,7 +35,7 @@ async def upload_file(
 @router.get("/files/{file_id}", response_model=FileRead)
 async def get_file(
     file_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
-) -> File:
+) -> FileDTO:
     return await storage_service.get_file(id=file_id, owner=user)
 
 
@@ -65,7 +67,7 @@ async def download_file(
 @router.post("/folders", response_model=FolderRead, status_code=status.HTTP_201_CREATED)
 async def create_folder(
     folder_data: FolderCreate, storage_service: StorageServiceDep, user: CurrentUserDep
-) -> Folder:
+) -> FolderDTO:
     return await storage_service.create_folder(
         name=folder_data.name, parent_id=folder_data.parent_id, owner=user
     )
@@ -74,19 +76,19 @@ async def create_folder(
 @router.get("/folders/{folder_id}", response_model=FolderRead)
 async def get_folder(
     folder_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
-) -> Folder:
+) -> FolderDTO:
     return await storage_service.get_folder(id=folder_id, owner=user)
 
 
-@router.get("/folders/home/items", response_model=Sequence[ItemRead])
-async def get_home_items(
+@router.get("/folders/root/items", response_model=Sequence[ItemRead])
+async def get_root_items(
     storage_service: StorageServiceDep, user: CurrentUserDep
-) -> Sequence[StorageItem]:
-    return await storage_service.get_home_items(owner=user)
+) -> list[FileDTO | FolderDTO]:
+    return await storage_service.get_root_items(owner=user)
 
 
 @router.get("/folders/{folder_id}/items", response_model=Sequence[ItemRead])
 async def get_folder_items(
     folder_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
-) -> Sequence[StorageItem]:
+) -> list[FileDTO | FolderDTO]:
     return await storage_service.get_folder_items(id=folder_id, owner=user)

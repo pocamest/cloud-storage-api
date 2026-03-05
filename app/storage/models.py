@@ -11,6 +11,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from app.storage.types import StorageItemKind
 
 UNIQUE_NAME_WITHIN_PARENT = "unique_name_within_parent"
 
@@ -64,8 +65,8 @@ class File(StorageItem):
     size: Mapped[int] = mapped_column(BigInteger, nullable=True)
     s3_key: Mapped[str] = mapped_column(String(255), nullable=True, unique=True)
 
-    __mapper_args__ = {"polymorphic_identity": "file"}
+    __mapper_args__ = {"polymorphic_identity": StorageItemKind.FILE}
 
 
 class Folder(StorageItem):
-    __mapper_args__ = {"polymorphic_identity": "folder"}
+    __mapper_args__ = {"polymorphic_identity": StorageItemKind.FOLDER}
