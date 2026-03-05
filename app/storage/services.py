@@ -1,22 +1,22 @@
 import uuid
-from collections.abc import Sequence
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.storage.adapters import S3Adapter
-from app.storage.dtos import DownloadFileDTO
+from app.storage.dtos import DownloadFileDTO, FileDTO, FolderDTO
 from app.storage.exceptions import (
     FileNotFoundError,
     FolderNotFoundError,
     NameAlreadyTakenError,
 )
-from app.storage.models import UNIQUE_NAME_WITHIN_PARENT, File, Folder, StorageItem
+from app.storage.models import UNIQUE_NAME_WITHIN_PARENT, File, Folder
 from app.storage.repositories import StorageItemRepository
 from app.users.models import User
 
 
+# TODO: становится много хелперов, видимо нужен будет отдельный доменный сервис
 class StorageService:
     def __init__(
         self,
@@ -29,13 +29,13 @@ class StorageService:
         self._s3_adapter = s3_adapter
         self._s3_files_prefix = settings.s3_files_prefix
 
-    async def _check_parent_exists(
-        self, parent_id: uuid.UUID | None, owner_id: uuid.UUID
+    async def _check_folder_exists(
+        self, id: uuid.UUID | None, owner_id: uuid.UUID
     ) -> None:
-        if parent_id is None:
+        if id is None:
             return
         parent = await self._storage_item_repo.find_by_id_and_owner(
-            id=parent_id, owner_id=owner_id, model_class=Folder
+            id=id, owner_id=owner_id, model_class=Folder
         )
         if parent is None:
             raise FolderNotFoundError()
@@ -49,6 +49,37 @@ class StorageService:
         if name_exists_in_parent:
             raise NameAlreadyTakenError()
 
+    async def _build_path(self, id: uuid.UUID | None, owner_id: uuid.UUID) -> str:
+        root = "/"
+        if id is None:
+            return root
+        items = await self._storage_item_repo.get_names_for_self_and_parents(
+            id=id, owner_id=owner_id
+        )
+
+        # TODO: по идеи в пути для папки в конце должен быть "/", или так оставлю
+        path = "/".join(items)
+        return f"{root}{path}"
+
+    def _map_file_to_dto(self, file: File, path: str) -> FileDTO:
+        return FileDTO(
+            id=file.id,
+            name=file.name,
+            owner_id=file.owner_id,
+            parent_id=file.parent_id,
+            size=file.size,
+            path=path,
+        )
+
+    def _map_folder_to_dto(self, folder: Folder, path: str) -> FolderDTO:
+        return FolderDTO(
+            id=folder.id,
+            name=folder.name,
+            owner_id=folder.owner_id,
+            parent_id=folder.parent_id,
+            path=path,
+        )
+
     # TODO: нужно разобраться с ограничением на размер файла
     async def upload_file(
         self,
@@ -56,8 +87,8 @@ class StorageService:
         parent_id: uuid.UUID | None,
         content: bytes,
         owner: User,
-    ) -> File:
-        await self._check_parent_exists(parent_id=parent_id, owner_id=owner.id)
+    ) -> FileDTO:
+        await self._check_folder_exists(id=parent_id, owner_id=owner.id)
         name = filename or str(uuid.uuid4())
         await self._check_name_not_exists_in_parent(
             name=name, parent_id=parent_id, owner_id=owner.id
@@ -81,7 +112,9 @@ class StorageService:
 
             await self._session.commit()
 
-            return file
+            path = await self._build_path(id=file.id, owner_id=file.owner_id)
+
+            return self._map_file_to_dto(file=file, path=path)
 
         except IntegrityError as e:
             await self._session.rollback()
@@ -95,14 +128,16 @@ class StorageService:
             await self._s3_adapter.delete(s3_key)
             raise
 
-    async def get_file(self, id: uuid.UUID, owner: User) -> File:
+    async def get_file(self, id: uuid.UUID, owner: User) -> FileDTO:
         file = await self._storage_item_repo.find_by_id_and_owner(
             id=id, owner_id=owner.id, model_class=File
         )
         if file is None:
             raise FileNotFoundError()
 
-        return file
+        path = await self._build_path(id=file.id, owner_id=file.owner_id)
+
+        return self._map_file_to_dto(file=file, path=path)
 
     async def delete_file(self, id: uuid.UUID, owner: User) -> None:
         file = await self._storage_item_repo.find_by_id_and_owner(
@@ -130,8 +165,8 @@ class StorageService:
 
     async def create_folder(
         self, name: str, parent_id: uuid.UUID | None, owner: User
-    ) -> Folder:
-        await self._check_parent_exists(parent_id=parent_id, owner_id=owner.id)
+    ) -> FolderDTO:
+        await self._check_folder_exists(id=parent_id, owner_id=owner.id)
         await self._check_name_not_exists_in_parent(
             name=name, parent_id=parent_id, owner_id=owner.id
         )
@@ -144,7 +179,9 @@ class StorageService:
 
             await self._session.commit()
 
-            return folder
+            path = await self._build_path(id=folder.id, owner_id=folder.owner_id)
+
+            return self._map_folder_to_dto(folder=folder, path=path)
 
         except IntegrityError as e:
             await self._session.rollback()
@@ -152,21 +189,42 @@ class StorageService:
                 raise NameAlreadyTakenError() from e
             raise
 
-    async def get_folder(self, id: uuid.UUID, owner: User) -> Folder:
+    async def get_folder(self, id: uuid.UUID, owner: User) -> FolderDTO:
         folder = await self._storage_item_repo.find_by_id_and_owner(
             id=id, owner_id=owner.id, model_class=Folder
         )
         if folder is None:
             raise FolderNotFoundError()
 
-        return folder
+        path = await self._build_path(id=folder.id, owner_id=folder.owner_id)
+
+        return self._map_folder_to_dto(folder=folder, path=path)
 
     async def get_folder_items(
         self, id: uuid.UUID | None, owner: User
-    ) -> Sequence[StorageItem]:
-        return await self._storage_item_repo.find_by_parent_and_owner(
+    ) -> list[FileDTO | FolderDTO]:
+        await self._check_folder_exists(id=id, owner_id=owner.id)
+
+        items = await self._storage_item_repo.find_by_parent_and_owner(
             owner_id=owner.id, parent_id=id
         )
 
-    async def get_home_items(self, owner: User) -> Sequence[StorageItem]:
+        result: list[FileDTO | FolderDTO] = []
+
+        base_path = await self._build_path(id=id, owner_id=owner.id)
+        # TODO: пока такой костыль, по-другому не придумал как собирать путь
+        base_path = "" if base_path == "/" else base_path
+
+        for item in items:
+            path = f"{base_path}/{item.name}"
+            if isinstance(item, File):
+                result.append(self._map_file_to_dto(file=item, path=path))
+            elif isinstance(item, Folder):
+                result.append(self._map_folder_to_dto(folder=item, path=path))
+            else:
+                raise ValueError("Invalid StorageItemKind")
+
+        return result
+
+    async def get_root_items(self, owner: User) -> list[FileDTO | FolderDTO]:
         return await self.get_folder_items(id=None, owner=owner)

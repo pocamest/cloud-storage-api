@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Sequence
 from typing import TypeVar
 
-from sqlalchemy import select
+from sqlalchemy import and_, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import with_polymorphic
 
@@ -51,5 +51,30 @@ class StorageItemRepository:
             full_storage_item.owner_id == owner_id,
             full_storage_item.parent_id == parent_id,
         )
+        result = await self._session.execute(stmt)
+        return result.scalars().all()
+
+    # TODO: Проверить синтаксис и отрефакторить
+    async def get_names_for_self_and_parents(
+        self, id: uuid.UUID, owner_id: uuid.UUID
+    ) -> Sequence[str]:
+        anchor = select(
+            StorageItem.parent_id, StorageItem.name, literal(0).label("level")
+        ).where(StorageItem.id == id, StorageItem.owner_id == owner_id)
+        cte = anchor.cte("cte", recursive=True)
+
+        recursive_part = select(
+            StorageItem.parent_id, StorageItem.name, cte.c.level + 1
+        ).join(
+            cte,
+            and_(
+                StorageItem.id == cte.c.parent_id,
+                StorageItem.owner_id == owner_id,
+            ),
+        )
+
+        cte = cte.union_all(recursive_part)
+
+        stmt = select(cte.c.name).order_by(cte.c.level.desc())
         result = await self._session.execute(stmt)
         return result.scalars().all()
