@@ -2,7 +2,7 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.core.types import NormalizedEmail
+from app.users.types import NormalizedEmail
 
 
 class UserCreate(BaseModel):
