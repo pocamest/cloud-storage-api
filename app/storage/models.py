@@ -51,6 +51,8 @@ class StorageItem(Base):
     __mapper_args__ = {
         "polymorphic_on": kind,
         "polymorphic_identity": "storage_item",
+        # сразу загружает поля наследников, потому что lazy_load в async не работает
+        "with_polymorphic": "*",
     }
 
     def __repr__(self) -> str:

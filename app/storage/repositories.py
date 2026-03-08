@@ -4,7 +4,6 @@ from typing import TypeVar
 
 from sqlalchemy import and_, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import with_polymorphic
 
 from app.storage.models import StorageItem
 
@@ -45,11 +44,9 @@ class StorageItemRepository:
     async def find_by_parent_and_owner(
         self, owner_id: uuid.UUID, parent_id: uuid.UUID | None
     ) -> Sequence[StorageItem]:
-        # сразу загружает поля наследников, потому что lazy_load в async не работает
-        full_storage_item = with_polymorphic(StorageItem, "*")
-        stmt = select(full_storage_item).where(
-            full_storage_item.owner_id == owner_id,
-            full_storage_item.parent_id == parent_id,
+        stmt = select(StorageItem).where(
+            StorageItem.owner_id == owner_id,
+            StorageItem.parent_id == parent_id,
         )
         result = await self._session.execute(stmt)
         return result.scalars().all()
@@ -82,10 +79,9 @@ class StorageItemRepository:
     async def find_by_name_substring(
         self, name_substring: str, owner_id: uuid.UUID
     ) -> Sequence[StorageItem]:
-        full_storage_item = with_polymorphic(StorageItem, "*")
-        stmt = select(full_storage_item).where(
-            full_storage_item.name.icontains(name_substring),
-            full_storage_item.owner_id == owner_id,
+        stmt = select(StorageItem).where(
+            StorageItem.name.icontains(name_substring),
+            StorageItem.owner_id == owner_id,
         )
         result = await self._session.execute(stmt)
         return result.scalars().all()
