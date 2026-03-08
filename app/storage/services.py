@@ -11,7 +11,7 @@ from app.storage.exceptions import (
     FolderNotFoundError,
     NameAlreadyTakenError,
 )
-from app.storage.models import UNIQUE_NAME_WITHIN_PARENT, File, Folder
+from app.storage.models import UNIQUE_NAME_WITHIN_PARENT, File, Folder, StorageItem
 from app.storage.repositories import StorageItemRepository
 from app.users.models import User
 
@@ -79,6 +79,14 @@ class StorageService:
             parent_id=folder.parent_id,
             path=path,
         )
+
+    def _map_to_dto(self, item: StorageItem, path: str) -> FileDTO | FolderDTO:
+        if isinstance(item, File):
+            return self._map_file_to_dto(file=item, path=path)
+        if isinstance(item, Folder):
+            return self._map_folder_to_dto(folder=item, path=path)
+
+        raise ValueError(f"Invalid kind: {item}")
 
     # TODO: нужно разобраться с ограничением на размер файла
     async def upload_file(
@@ -217,14 +225,22 @@ class StorageService:
 
         for item in items:
             path = f"{base_path}/{item.name}"
-            if isinstance(item, File):
-                result.append(self._map_file_to_dto(file=item, path=path))
-            elif isinstance(item, Folder):
-                result.append(self._map_folder_to_dto(folder=item, path=path))
-            else:
-                raise ValueError("Invalid StorageItemKind")
+            result.append(self._map_to_dto(item=item, path=path))
 
         return result
 
     async def get_root_items(self, owner: User) -> list[FileDTO | FolderDTO]:
         return await self.get_folder_items(id=None, owner=owner)
+
+    async def search(self, query: str, owner: User) -> list[FileDTO | FolderDTO]:
+        items = await self._storage_item_repo.find_by_name_substring(
+            name_substring=query, owner_id=owner.id
+        )
+
+        result: list[FileDTO | FolderDTO] = []
+
+        for item in items:
+            path = await self._build_path(id=item.id, owner_id=item.owner_id)
+            result.append(self._map_to_dto(item=item, path=path))
+
+        return result

@@ -1,5 +1,4 @@
 import uuid
-from collections.abc import Sequence
 from typing import Annotated
 from urllib.parse import quote
 
@@ -13,7 +12,7 @@ from app.storage.dependencies import StorageServiceDep
 from app.storage.dtos import FileDTO, FolderDTO
 from app.storage.schemas import FileRead, FolderCreate, FolderRead, ItemRead
 
-router = APIRouter(tags=["storage"])
+router = APIRouter(prefix="/storage", tags=["storage"])
 
 
 # TODO: пока загружаю весь файл, возможно переделаю на стриминг
@@ -80,15 +79,22 @@ async def get_folder(
     return await storage_service.get_folder(id=folder_id, owner=user)
 
 
-@router.get("/folders/root/items", response_model=Sequence[ItemRead])
+@router.get("/folders/root/items", response_model=list[ItemRead])
 async def get_root_items(
     storage_service: StorageServiceDep, user: CurrentUserDep
 ) -> list[FileDTO | FolderDTO]:
     return await storage_service.get_root_items(owner=user)
 
 
-@router.get("/folders/{folder_id}/items", response_model=Sequence[ItemRead])
+@router.get("/folders/{folder_id}/items", response_model=list[ItemRead])
 async def get_folder_items(
     folder_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
 ) -> list[FileDTO | FolderDTO]:
     return await storage_service.get_folder_items(id=folder_id, owner=user)
+
+
+@router.get("/search", response_model=list[ItemRead])
+async def search(
+    query: str, storage_service: StorageServiceDep, user: CurrentUserDep
+) -> list[FileDTO | FolderDTO]:
+    return await storage_service.search(query=query, owner=user)
