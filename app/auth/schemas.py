@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
-from app.core.types import NormalizedEmail
 from app.users.schemas import UserRead
+from app.users.types import NormalizedEmail
 
 
 class LoginRequest(BaseModel):
