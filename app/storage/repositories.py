@@ -78,3 +78,14 @@ class StorageItemRepository:
         stmt = select(cte.c.name).order_by(cte.c.level.desc())
         result = await self._session.execute(stmt)
         return result.scalars().all()
+
+    async def find_by_name_substring(
+        self, name_substring: str, owner_id: uuid.UUID
+    ) -> Sequence[StorageItem]:
+        full_storage_item = with_polymorphic(StorageItem, "*")
+        stmt = select(full_storage_item).where(
+            full_storage_item.name.icontains(name_substring),
+            full_storage_item.owner_id == owner_id,
+        )
+        result = await self._session.execute(stmt)
+        return result.scalars().all()
