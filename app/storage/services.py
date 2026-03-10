@@ -29,16 +29,14 @@ class StorageService:
         self._s3_adapter = s3_adapter
         self._s3_files_prefix = settings.s3_files_prefix
 
-    async def _check_folder_exists(
-        self, id: uuid.UUID | None, owner_id: uuid.UUID
-    ) -> None:
-        if id is None:
-            return
-        parent = await self._storage_item_repo.find_by_id_and_owner(
+    async def _check_folder_exists(self, id: uuid.UUID, owner_id: uuid.UUID) -> Folder:
+        folder = await self._storage_item_repo.find_by_id_and_owner(
             id=id, owner_id=owner_id, model_class=Folder
         )
-        if parent is None:
+        if folder is None:
             raise FolderNotFoundError()
+
+        return folder
 
     async def _check_name_not_exists_in_parent(
         self, name: str, parent_id: uuid.UUID | None, owner_id: uuid.UUID
@@ -96,7 +94,8 @@ class StorageService:
         content: bytes,
         owner: User,
     ) -> FileDTO:
-        await self._check_folder_exists(id=parent_id, owner_id=owner.id)
+        if parent_id is not None:
+            await self._check_folder_exists(id=parent_id, owner_id=owner.id)
         name = filename or str(uuid.uuid4())
         await self._check_name_not_exists_in_parent(
             name=name, parent_id=parent_id, owner_id=owner.id
@@ -174,7 +173,8 @@ class StorageService:
     async def create_folder(
         self, name: str, parent_id: uuid.UUID | None, owner: User
     ) -> FolderDTO:
-        await self._check_folder_exists(id=parent_id, owner_id=owner.id)
+        if parent_id is not None:
+            await self._check_folder_exists(id=parent_id, owner_id=owner.id)
         await self._check_name_not_exists_in_parent(
             name=name, parent_id=parent_id, owner_id=owner.id
         )
@@ -208,10 +208,23 @@ class StorageService:
 
         return self._map_folder_to_dto(folder=folder, path=path)
 
+    async def delete_folder(self, id: uuid.UUID, owner: User) -> None:
+        folder = await self._check_folder_exists(id=id, owner_id=owner.id)
+
+        s3_keys = await self._storage_item_repo.get_s3_key_for_all_children(
+            id=id, owner_id=owner.id
+        )
+
+        await self._storage_item_repo.delete(folder)
+        await self._session.commit()
+
+        await self._s3_adapter.delete_objects(s3_keys)
+
     async def get_folder_items(
         self, id: uuid.UUID | None, owner: User
     ) -> list[FileDTO | FolderDTO]:
-        await self._check_folder_exists(id=id, owner_id=owner.id)
+        if id is not None:
+            await self._check_folder_exists(id=id, owner_id=owner.id)
 
         items = await self._storage_item_repo.find_by_parent_and_owner(
             owner_id=owner.id, parent_id=id
