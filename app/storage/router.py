@@ -79,6 +79,13 @@ async def get_folder(
     return await storage_service.get_folder(id=folder_id, owner=user)
 
 
+@router.delete("/folders/{folder_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_folder(
+    folder_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
+) -> None:
+    await storage_service.delete_folder(id=folder_id, owner=user)
+
+
 @router.get("/folders/root/items", response_model=list[ItemRead])
 async def get_root_items(
     storage_service: StorageServiceDep, user: CurrentUserDep
