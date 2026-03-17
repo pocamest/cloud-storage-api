@@ -105,3 +105,23 @@ class StorageItemRepository:
         stmt = select(cte.c.s3_key).where(cte.c.s3_key.is_not(None))
         result = await self._session.execute(stmt)
         return result.scalars().all()
+
+    async def get_ids_for_parents(
+        self, id: uuid.UUID, owner_id: uuid.UUID
+    ) -> Sequence[uuid.UUID]:
+        anchor = select(StorageItem.parent_id).where(
+            StorageItem.id == id, StorageItem.owner_id == owner_id
+        )
+
+        cte = anchor.cte(name="cte", recursive=True)
+
+        recursive_part = select(StorageItem.parent_id).join(
+            cte,
+            and_(StorageItem.id == cte.c.parent_id, StorageItem.owner_id == owner_id),
+        )
+
+        cte = cte.union_all(recursive_part)
+
+        stmt = select(cte.c.parent_id)
+        result = await self._session.execute(stmt)
+        return result.scalars().all()

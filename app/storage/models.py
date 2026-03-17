@@ -44,8 +44,8 @@ class StorageItem(Base):
         ForeignKey("users.id", ondelete="CASCADE")
     )
     # parent_id = None/NULL считается корневой папкой у пользователя
-    parent_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("storage_items.id", ondelete="CASCADE"), nullable=True, index=True
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("storage_items.id", ondelete="CASCADE"), index=True
     )
 
     __mapper_args__ = {
