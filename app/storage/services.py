@@ -285,7 +285,7 @@ class StorageService:
         await self._check_name_not_exists_in_parent(
             name=new_name,
             parent_id=file.parent_id,
-            owner_id=file.id,
+            owner_id=file.owner_id,
         )
 
         file.name = new_name
