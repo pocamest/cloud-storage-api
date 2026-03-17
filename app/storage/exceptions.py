@@ -19,6 +19,18 @@ class FolderNotFoundError(StorageError):
     error_code = ErrorCode.FOLDER_NOT_FOUND
 
 
+class FolderTargetIsSelf(StorageError):
+    status_code = status.HTTP_409_CONFLICT
+    detail = "Folder cannot be moved into self"
+    error_code = ErrorCode.FOLDER_TARGET_IS_SELF
+
+
+class FolderTargetIsSubfolder(StorageError):
+    status_code = status.HTTP_409_CONFLICT
+    detail = "Folder cannot be moved into subfolder"
+    error_code = ErrorCode.FOLDER_TARGET_IS_SUBFOLDER
+
+
 class NameAlreadyTakenError(StorageError):
     status_code = status.HTTP_409_CONFLICT
     detail = "The name is already taken"

@@ -7,12 +7,21 @@ from fastapi.responses import Response
 
 from app.auth.dependencies import CurrentUserDep
 from app.storage.dependencies import StorageServiceDep
-
-# from app.storage.models import File, Folder, StorageItem
 from app.storage.dtos import FileDTO, FolderDTO
-from app.storage.schemas import FileRead, FolderCreate, FolderRead, ItemRead
+from app.storage.schemas import (
+    FileMove,
+    FileRead,
+    FileRename,
+    FolderCreate,
+    FolderMove,
+    FolderRead,
+    FolderRename,
+    ItemRead,
+)
 
 router = APIRouter(prefix="/storage", tags=["storage"])
+
+# TODO: подумать как эндпоинты отсортировать
 
 
 # TODO: пока загружаю весь файл, возможно переделаю на стриминг
@@ -105,3 +114,51 @@ async def search(
     query: str, storage_service: StorageServiceDep, user: CurrentUserDep
 ) -> list[FileDTO | FolderDTO]:
     return await storage_service.search(query=query, owner=user)
+
+
+@router.post("/files/{file_id}/rename", response_model=FileRead)
+async def rename_file(
+    file_id: uuid.UUID,
+    rename_data: FileRename,
+    storage_service: StorageServiceDep,
+    user: CurrentUserDep,
+) -> FileDTO:
+    return await storage_service.rename_file(
+        id=file_id, new_name=rename_data.new_name, owner=user
+    )
+
+
+@router.post("/files/{file_id}/move", response_model=FileRead)
+async def move_file(
+    file_id: uuid.UUID,
+    move_data: FileMove,
+    storage_service: StorageServiceDep,
+    user: CurrentUserDep,
+) -> FileDTO:
+    return await storage_service.move_file(
+        id=file_id, new_parent_id=move_data.new_parent_id, owner=user
+    )
+
+
+@router.post("/folders/{folder_id}/rename", response_model=FolderRead)
+async def rename_folder(
+    folder_id: uuid.UUID,
+    rename_data: FolderRename,
+    storage_service: StorageServiceDep,
+    user: CurrentUserDep,
+) -> FolderDTO:
+    return await storage_service.rename_folder(
+        id=folder_id, new_name=rename_data.new_name, owner=user
+    )
+
+
+@router.post("/folders/{folder_id}/move", response_model=FolderRead)
+async def move_folder(
+    folder_id: uuid.UUID,
+    move_data: FolderMove,
+    storage_service: StorageServiceDep,
+    user: CurrentUserDep,
+) -> FolderDTO:
+    return await storage_service.move_folder(
+        id=folder_id, new_parent_id=move_data.new_parent_id, owner=user
+    )

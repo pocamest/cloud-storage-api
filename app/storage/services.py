@@ -9,6 +9,8 @@ from app.storage.dtos import DownloadFileDTO, FileDTO, FolderDTO
 from app.storage.exceptions import (
     FileNotFoundError,
     FolderNotFoundError,
+    FolderTargetIsSelf,
+    FolderTargetIsSubfolder,
     NameAlreadyTakenError,
 )
 from app.storage.models import UNIQUE_NAME_WITHIN_PARENT, File, Folder, StorageItem
@@ -29,6 +31,15 @@ class StorageService:
         self._s3_adapter = s3_adapter
         self._s3_files_prefix = settings.s3_files_prefix
 
+    async def _check_file_exists(self, id: uuid.UUID, owner_id: uuid.UUID) -> File:
+        file = await self._storage_item_repo.find_by_id_and_owner(
+            id=id, owner_id=owner_id, model_class=File
+        )
+        if file is None:
+            raise FileNotFoundError()
+
+        return file
+
     async def _check_folder_exists(self, id: uuid.UUID, owner_id: uuid.UUID) -> Folder:
         folder = await self._storage_item_repo.find_by_id_and_owner(
             id=id, owner_id=owner_id, model_class=Folder
@@ -46,6 +57,15 @@ class StorageService:
         )
         if name_exists_in_parent:
             raise NameAlreadyTakenError()
+
+    async def _check_target_is_not_subfolder(
+        self, id: uuid.UUID, new_parent_id: uuid.UUID, owner_id: uuid.UUID
+    ) -> None:
+        parents = await self._storage_item_repo.get_ids_for_parents(
+            id=new_parent_id, owner_id=owner_id
+        )
+        if id in parents:
+            raise FolderTargetIsSubfolder()
 
     async def _build_path(self, id: uuid.UUID | None, owner_id: uuid.UUID) -> str:
         root = "/"
@@ -253,7 +273,83 @@ class StorageService:
         result: list[FileDTO | FolderDTO] = []
 
         for item in items:
+            # TODO: Проблема N+1
             path = await self._build_path(id=item.id, owner_id=item.owner_id)
             result.append(self._map_to_dto(item=item, path=path))
 
         return result
+
+    async def rename_file(self, id: uuid.UUID, new_name: str, owner: User) -> FileDTO:
+        file = await self._check_file_exists(id=id, owner_id=owner.id)
+
+        await self._check_name_not_exists_in_parent(
+            name=new_name,
+            parent_id=file.parent_id,
+            owner_id=file.id,
+        )
+
+        file.name = new_name
+        await self._session.commit()
+
+        path = await self._build_path(id=file.id, owner_id=file.owner_id)
+
+        return self._map_file_to_dto(file=file, path=path)
+
+    async def move_file(
+        self, id: uuid.UUID, new_parent_id: uuid.UUID | None, owner: User
+    ) -> FileDTO:
+        file = await self._check_file_exists(id=id, owner_id=owner.id)
+
+        if new_parent_id is not None:
+            await self._check_folder_exists(id=new_parent_id, owner_id=file.owner_id)
+        await self._check_name_not_exists_in_parent(
+            name=file.name, parent_id=new_parent_id, owner_id=file.owner_id
+        )
+
+        file.parent_id = new_parent_id
+        await self._session.commit()
+
+        path = await self._build_path(id=file.id, owner_id=file.owner_id)
+
+        return self._map_file_to_dto(file=file, path=path)
+
+    async def rename_folder(
+        self, id: uuid.UUID, new_name: str, owner: User
+    ) -> FolderDTO:
+        folder = await self._check_folder_exists(id=id, owner_id=owner.id)
+
+        await self._check_name_not_exists_in_parent(
+            name=new_name, parent_id=id, owner_id=owner.id
+        )
+
+        folder.name = new_name
+        await self._session.commit()
+
+        path = await self._build_path(id=folder.id, owner_id=folder.owner_id)
+
+        return self._map_folder_to_dto(folder=folder, path=path)
+
+    async def move_folder(
+        self, id: uuid.UUID, new_parent_id: uuid.UUID | None, owner: User
+    ) -> FolderDTO:
+        if id == new_parent_id:
+            raise FolderTargetIsSelf()
+
+        folder = await self._check_folder_exists(id=id, owner_id=owner.id)
+
+        if new_parent_id is not None:
+            await self._check_folder_exists(id=new_parent_id, owner_id=owner.id)
+            await self._check_target_is_not_subfolder(
+                id=id, new_parent_id=new_parent_id, owner_id=folder.owner_id
+            )
+
+        await self._check_name_not_exists_in_parent(
+            name=folder.name, parent_id=new_parent_id, owner_id=folder.owner_id
+        )
+
+        folder.parent_id = new_parent_id
+        await self._session.commit()
+
+        path = await self._build_path(id=folder.id, owner_id=folder.owner_id)
+
+        return self._map_folder_to_dto(folder=folder, path=path)

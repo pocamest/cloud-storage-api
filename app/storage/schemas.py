@@ -39,3 +39,19 @@ class FolderRead(BaseModel):
 
 
 ItemRead = Annotated[FileRead | FolderRead, Field(discriminator="kind")]
+
+
+class FileRename(BaseModel):
+    new_name: str
+
+
+class FileMove(BaseModel):
+    new_parent_id: uuid.UUID | None
+
+
+class FolderRename(BaseModel):
+    new_name: str
+
+
+class FolderMove(BaseModel):
+    new_parent_id: uuid.UUID | None
