@@ -52,6 +52,11 @@ class StorageService:
     async def _check_name_not_exists_in_parent(
         self, name: str, parent_id: uuid.UUID | None, owner_id: uuid.UUID
     ) -> None:
+        """
+        Не гарантирует уникальность из-за состояния гонки при параллельных запросах.
+        Используется только для оптимизации перед затратными операциями.
+        Основная защита это ограничение  UNIQUE_NAME_WITHIN_PARENT на уровне БД
+        """
         name_exists_in_parent = await self._storage_item_repo.name_exists(
             name=name, owner_id=owner_id, parent_id=parent_id
         )
@@ -71,11 +76,11 @@ class StorageService:
         root = "/"
         if id is None:
             return root
+
         items = await self._storage_item_repo.get_names_for_self_and_parents(
             id=id, owner_id=owner_id
         )
 
-        # TODO: по идеи в пути для папки в конце должен быть "/", или так оставлю
         path = "/".join(items)
         return f"{root}{path}"
 
@@ -123,6 +128,8 @@ class StorageService:
 
         file_id = uuid.uuid4()
         s3_key = f"{self._s3_files_prefix}/{owner.id}/{file_id}"
+
+        # TODO: все время как скачивается файл, уже удерживается БД соединение.
         await self._s3_adapter.upload(key=s3_key, content=content)
 
         try:
@@ -195,9 +202,6 @@ class StorageService:
     ) -> FolderDTO:
         if parent_id is not None:
             await self._check_folder_exists(id=parent_id, owner_id=owner.id)
-        await self._check_name_not_exists_in_parent(
-            name=name, parent_id=parent_id, owner_id=owner.id
-        )
 
         id = uuid.uuid4()
         try:
@@ -282,14 +286,14 @@ class StorageService:
     async def rename_file(self, id: uuid.UUID, new_name: str, owner: User) -> FileDTO:
         file = await self._check_file_exists(id=id, owner_id=owner.id)
 
-        await self._check_name_not_exists_in_parent(
-            name=new_name,
-            parent_id=file.parent_id,
-            owner_id=file.owner_id,
-        )
-
-        file.name = new_name
-        await self._session.commit()
+        try:
+            file.name = new_name
+            await self._session.commit()
+        except IntegrityError as e:
+            await self._session.rollback()
+            if UNIQUE_NAME_WITHIN_PARENT in str(e.orig):
+                raise NameAlreadyTakenError() from e
+            raise
 
         path = await self._build_path(id=file.id, owner_id=file.owner_id)
 
@@ -302,12 +306,15 @@ class StorageService:
 
         if new_parent_id is not None:
             await self._check_folder_exists(id=new_parent_id, owner_id=file.owner_id)
-        await self._check_name_not_exists_in_parent(
-            name=file.name, parent_id=new_parent_id, owner_id=file.owner_id
-        )
 
-        file.parent_id = new_parent_id
-        await self._session.commit()
+        try:
+            file.parent_id = new_parent_id
+            await self._session.commit()
+        except IntegrityError as e:
+            await self._session.rollback()
+            if UNIQUE_NAME_WITHIN_PARENT in str(e.orig):
+                raise NameAlreadyTakenError() from e
+            raise
 
         path = await self._build_path(id=file.id, owner_id=file.owner_id)
 
@@ -318,12 +325,14 @@ class StorageService:
     ) -> FolderDTO:
         folder = await self._check_folder_exists(id=id, owner_id=owner.id)
 
-        await self._check_name_not_exists_in_parent(
-            name=new_name, parent_id=id, owner_id=owner.id
-        )
-
-        folder.name = new_name
-        await self._session.commit()
+        try:
+            folder.name = new_name
+            await self._session.commit()
+        except IntegrityError as e:
+            await self._session.rollback()
+            if UNIQUE_NAME_WITHIN_PARENT in str(e.orig):
+                raise NameAlreadyTakenError() from e
+            raise
 
         path = await self._build_path(id=folder.id, owner_id=folder.owner_id)
 
@@ -343,12 +352,14 @@ class StorageService:
                 id=id, new_parent_id=new_parent_id, owner_id=folder.owner_id
             )
 
-        await self._check_name_not_exists_in_parent(
-            name=folder.name, parent_id=new_parent_id, owner_id=folder.owner_id
-        )
-
-        folder.parent_id = new_parent_id
-        await self._session.commit()
+        try:
+            folder.parent_id = new_parent_id
+            await self._session.commit()
+        except IntegrityError as e:
+            await self._session.rollback()
+            if UNIQUE_NAME_WITHIN_PARENT in str(e.orig):
+                raise NameAlreadyTakenError() from e
+            raise
 
         path = await self._build_path(id=folder.id, owner_id=folder.owner_id)
 
