@@ -6,6 +6,7 @@ from sqlalchemy import and_, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.storage.models import StorageItem
+from app.storage.types import StorageItemKind
 
 StorageItemT = TypeVar("StorageItemT", bound=StorageItem)
 
@@ -90,19 +91,19 @@ class StorageItemRepository:
         self, id: uuid.UUID, owner_id: uuid.UUID
     ) -> Sequence[str]:
         s3_key_column = StorageItem.__table__.c.s3_key
-        anchor = select(StorageItem.id, s3_key_column).where(
+        anchor = select(StorageItem.id, StorageItem.kind, s3_key_column).where(
             StorageItem.id == id, StorageItem.owner_id == owner_id
         )
         cte = anchor.cte("cte", recursive=True)
 
-        recursive_part = select(StorageItem.id, s3_key_column).join(
+        recursive_part = select(StorageItem.id, StorageItem.kind, s3_key_column).join(
             cte,
             and_(StorageItem.parent_id == cte.c.id, StorageItem.owner_id == owner_id),
         )
 
         cte = cte.union_all(recursive_part)
 
-        stmt = select(cte.c.s3_key).where(cte.c.s3_key.is_not(None))
+        stmt = select(cte.c.s3_key).where(cte.c.kind == StorageItemKind.FILE)
         result = await self._session.execute(stmt)
         return result.scalars().all()
 
