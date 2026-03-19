@@ -21,7 +21,12 @@ from app.storage.schemas import (
 
 router = APIRouter(prefix="/storage", tags=["storage"])
 
-# TODO: подумать как эндпоинты отсортировать
+
+@router.get("/search", response_model=list[ItemRead])
+async def search(
+    query: str, storage_service: StorageServiceDep, user: CurrentUserDep
+) -> list[FileDTO | FolderDTO]:
+    return await storage_service.search(query=query, owner=user)
 
 
 # TODO: пока загружаю весь файл, возможно переделаю на стриминг
@@ -72,6 +77,30 @@ async def download_file(
     )
 
 
+@router.post("/files/{file_id}/rename", response_model=FileRead)
+async def rename_file(
+    file_id: uuid.UUID,
+    rename_data: FileRename,
+    storage_service: StorageServiceDep,
+    user: CurrentUserDep,
+) -> FileDTO:
+    return await storage_service.rename_file(
+        id=file_id, new_name=rename_data.new_name, owner=user
+    )
+
+
+@router.post("/files/{file_id}/move", response_model=FileRead)
+async def move_file(
+    file_id: uuid.UUID,
+    move_data: FileMove,
+    storage_service: StorageServiceDep,
+    user: CurrentUserDep,
+) -> FileDTO:
+    return await storage_service.move_file(
+        id=file_id, new_parent_id=move_data.new_parent_id, owner=user
+    )
+
+
 @router.post("/folders", response_model=FolderRead, status_code=status.HTTP_201_CREATED)
 async def create_folder(
     folder_data: FolderCreate, storage_service: StorageServiceDep, user: CurrentUserDep
@@ -107,37 +136,6 @@ async def get_folder_items(
     folder_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
 ) -> list[FileDTO | FolderDTO]:
     return await storage_service.get_folder_items(id=folder_id, owner=user)
-
-
-@router.get("/search", response_model=list[ItemRead])
-async def search(
-    query: str, storage_service: StorageServiceDep, user: CurrentUserDep
-) -> list[FileDTO | FolderDTO]:
-    return await storage_service.search(query=query, owner=user)
-
-
-@router.post("/files/{file_id}/rename", response_model=FileRead)
-async def rename_file(
-    file_id: uuid.UUID,
-    rename_data: FileRename,
-    storage_service: StorageServiceDep,
-    user: CurrentUserDep,
-) -> FileDTO:
-    return await storage_service.rename_file(
-        id=file_id, new_name=rename_data.new_name, owner=user
-    )
-
-
-@router.post("/files/{file_id}/move", response_model=FileRead)
-async def move_file(
-    file_id: uuid.UUID,
-    move_data: FileMove,
-    storage_service: StorageServiceDep,
-    user: CurrentUserDep,
-) -> FileDTO:
-    return await storage_service.move_file(
-        id=file_id, new_parent_id=move_data.new_parent_id, owner=user
-    )
 
 
 @router.post("/folders/{folder_id}/rename", response_model=FolderRead)
