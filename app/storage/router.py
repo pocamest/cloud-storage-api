@@ -1,8 +1,8 @@
 import uuid
-from typing import Annotated
+from typing import Annotated, cast
 from urllib.parse import quote
 
-from fastapi import APIRouter, Form, UploadFile, status
+from fastapi import APIRouter, Form, status
 from fastapi.responses import Response
 
 from app.auth.dependencies import CurrentUserDep
@@ -16,13 +16,14 @@ from app.storage.schemas import (
     FolderMove,
     FolderRead,
     FolderRename,
-    ItemRead,
+    StorageItemRead,
 )
+from app.storage.types import StorageItemName, ValidUploadFile
 
 router = APIRouter(prefix="/storage", tags=["storage"])
 
 
-@router.get("/search", response_model=list[ItemRead])
+@router.get("/search", response_model=list[StorageItemRead])
 async def search(
     query: str, storage_service: StorageServiceDep, user: CurrentUserDep
 ) -> list[FileDTO | FolderDTO]:
@@ -34,14 +35,15 @@ async def search(
     "/files/upload", response_model=FileRead, status_code=status.HTTP_201_CREATED
 )
 async def upload_file(
-    file: UploadFile,
+    file: ValidUploadFile,
     storage_service: StorageServiceDep,
     user: CurrentUserDep,
     parent_id: Annotated[uuid.UUID | None, Form()] = None,
 ) -> FileDTO:
+    filename = cast(StorageItemName, file.filename)
     content = await file.read()
     return await storage_service.upload_file(
-        filename=file.filename, parent_id=parent_id, content=content, owner=user
+        filename=filename, parent_id=parent_id, content=content, owner=user
     )
 
 
@@ -124,14 +126,14 @@ async def delete_folder(
     await storage_service.delete_folder(id=folder_id, owner=user)
 
 
-@router.get("/folders/root/items", response_model=list[ItemRead])
+@router.get("/folders/root/items", response_model=list[StorageItemRead])
 async def get_root_items(
     storage_service: StorageServiceDep, user: CurrentUserDep
 ) -> list[FileDTO | FolderDTO]:
     return await storage_service.get_root_items(owner=user)
 
 
-@router.get("/folders/{folder_id}/items", response_model=list[ItemRead])
+@router.get("/folders/{folder_id}/items", response_model=list[StorageItemRead])
 async def get_folder_items(
     folder_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
 ) -> list[FileDTO | FolderDTO]:

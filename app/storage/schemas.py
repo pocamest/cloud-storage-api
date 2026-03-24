@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.storage.types import StorageItemKind
+from app.storage.types import StorageItemKind, StorageItemName
 
 
 class FileRead(BaseModel):
@@ -21,7 +21,7 @@ class FileRead(BaseModel):
 
 
 class FolderCreate(BaseModel):
-    name: str
+    name: StorageItemName
     parent_id: uuid.UUID | None
 
 
@@ -38,11 +38,11 @@ class FolderRead(BaseModel):
     path: str
 
 
-ItemRead = Annotated[FileRead | FolderRead, Field(discriminator="kind")]
+StorageItemRead = Annotated[FileRead | FolderRead, Field(discriminator="kind")]
 
 
 class FileRename(BaseModel):
-    new_name: str
+    new_name: StorageItemName
 
 
 class FileMove(BaseModel):
@@ -50,7 +50,7 @@ class FileMove(BaseModel):
 
 
 class FolderRename(BaseModel):
-    new_name: str
+    new_name: StorageItemName
 
 
 class FolderMove(BaseModel):
