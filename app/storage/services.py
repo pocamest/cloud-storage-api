@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.storage.adapters import S3Adapter
+from app.storage.constants import UNIQUE_NAME_WITHIN_PARENT
 from app.storage.dtos import DownloadFileDTO, FileDTO, FolderDTO
 from app.storage.exceptions import (
     FileNotFoundError,
@@ -13,7 +14,7 @@ from app.storage.exceptions import (
     FolderTargetIsSubfolder,
     NameAlreadyTakenError,
 )
-from app.storage.models import UNIQUE_NAME_WITHIN_PARENT, File, Folder, StorageItem
+from app.storage.models import File, Folder, StorageItem
 from app.storage.repositories import StorageItemRepository
 from app.users.models import User
 
@@ -114,16 +115,15 @@ class StorageService:
     # TODO: нужно разобраться с ограничением на размер файла
     async def upload_file(
         self,
-        filename: str | None,
+        filename: str,
         parent_id: uuid.UUID | None,
         content: bytes,
         owner: User,
     ) -> FileDTO:
         if parent_id is not None:
             await self._check_folder_exists(id=parent_id, owner_id=owner.id)
-        name = filename or str(uuid.uuid4())
         await self._check_name_not_exists_in_parent(
-            name=name, parent_id=parent_id, owner_id=owner.id
+            name=filename, parent_id=parent_id, owner_id=owner.id
         )
 
         file_id = uuid.uuid4()
@@ -136,7 +136,7 @@ class StorageService:
             file = self._storage_item_repo.add(
                 File(
                     id=file_id,
-                    name=name,
+                    name=filename,
                     owner_id=owner.id,
                     parent_id=parent_id,
                     size=len(content),

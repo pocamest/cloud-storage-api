@@ -11,9 +11,12 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from app.storage.constants import (
+    STORAGE_ITEM_NAME_MAX_LENGTH,
+    STORAGE_ITEM_NAME_PATTERN,
+    UNIQUE_NAME_WITHIN_PARENT,
+)
 from app.storage.types import StorageItemKind
-
-UNIQUE_NAME_WITHIN_PARENT = "unique_name_within_parent"
 
 
 class StorageItem(Base):
@@ -34,10 +37,14 @@ class StorageItem(Base):
             name="check_s3_key_not_null_for_file",
         ),
         CheckConstraint("parent_id != id", name="check_parent_is_not_self"),
+        CheckConstraint(
+            f"name ~ '{STORAGE_ITEM_NAME_PATTERN}'", name="check_name_is_valid"
+        ),
+        CheckConstraint("name = TRIM(name)", name="check_name_stripped_whitespace"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
-    name: Mapped[str] = mapped_column(String(255))
+    name: Mapped[str] = mapped_column(String(STORAGE_ITEM_NAME_MAX_LENGTH))
     kind: Mapped[str] = mapped_column(String(20))
 
     owner_id: Mapped[uuid.UUID] = mapped_column(
