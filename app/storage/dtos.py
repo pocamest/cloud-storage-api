@@ -32,3 +32,9 @@ class FolderDTO:
 class DownloadFileDTO:
     filename: str
     content: bytes
+
+
+@dataclass
+class DownloadFolderDTO:
+    archive_name: str
+    content: bytes

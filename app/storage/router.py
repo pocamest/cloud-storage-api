@@ -126,6 +126,23 @@ async def delete_folder(
     await storage_service.delete_folder(id=folder_id, owner=user)
 
 
+@router.get("/folders/{folder_id}/download")
+async def download_folder(
+    folder_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
+) -> Response:
+    data = await storage_service.download_folder(id=folder_id, owner=user)
+    encode_archive_name = quote(data.archive_name)
+
+    # TODO: потом спрятать
+    return Response(
+        data.content,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encode_archive_name}"
+        },
+    )
+
+
 @router.get("/folders/root/items", response_model=list[StorageItemRead])
 async def get_root_items(
     storage_service: StorageServiceDep, user: CurrentUserDep
