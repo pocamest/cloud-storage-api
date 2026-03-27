@@ -1,4 +1,6 @@
+import io
 import uuid
+import zipfile
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.storage.adapters import S3Adapter
 from app.storage.constants import UNIQUE_NAME_WITHIN_PARENT
-from app.storage.dtos import DownloadFileDTO, FileDTO, FolderDTO
+from app.storage.dtos import DownloadFileDTO, DownloadFolderDTO, FileDTO, FolderDTO
 from app.storage.exceptions import (
     FileNotFoundError,
     FolderNotFoundError,
@@ -364,3 +366,26 @@ class StorageService:
         path = await self._build_path(id=folder.id, owner_id=folder.owner_id)
 
         return self._map_folder_to_dto(folder=folder, path=path)
+
+    async def download_folder(self, id: uuid.UUID, owner: User) -> DownloadFolderDTO:
+        folder = await self._check_folder_exists(id=id, owner_id=owner.id)
+        folder_items = await self._storage_item_repo.get_subtree(
+            id=folder.id, owner_id=folder.owner_id
+        )
+
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            for item in folder_items:
+                s3_key = item.s3_key
+                relative_path = item.relative_path
+
+                if s3_key is not None:
+                    content = await self._s3_adapter.download(s3_key)
+                else:
+                    content = b""
+
+                zf.writestr(relative_path, content)
+
+        return DownloadFolderDTO(
+            archive_name=f"{folder.name}.zip", content=buffer.getvalue()
+        )

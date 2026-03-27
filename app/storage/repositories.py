@@ -1,14 +1,19 @@
 import uuid
 from collections.abc import Sequence
-from typing import TypeVar
+from typing import NamedTuple, TypeVar
 
-from sqlalchemy import and_, literal, select
+from sqlalchemy import Text, and_, case, cast, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.storage.models import StorageItem
 from app.storage.types import StorageItemKind
 
 StorageItemT = TypeVar("StorageItemT", bound=StorageItem)
+
+
+class SubtreeNode(NamedTuple):
+    relative_path: str
+    s3_key: str | None
 
 
 class StorageItemRepository:
@@ -62,7 +67,9 @@ class StorageItemRepository:
         cte = anchor.cte("cte", recursive=True)
 
         recursive_part = select(
-            StorageItem.parent_id, StorageItem.name, cte.c.level + 1
+            StorageItem.parent_id,
+            StorageItem.name,
+            cte.c.level + 1,  # TODO: здесь label наверное стоит добавить
         ).join(
             cte,
             and_(
@@ -126,3 +133,35 @@ class StorageItemRepository:
         stmt = select(cte.c.parent_id)
         result = await self._session.execute(stmt)
         return result.scalars().all()
+
+    async def get_subtree(
+        self, id: uuid.UUID, owner_id: uuid.UUID
+    ) -> list[SubtreeNode]:
+        s3_key_column = StorageItem.__table__.c.s3_key
+        anchor = select(
+            StorageItem.id,
+            StorageItem.kind,
+            s3_key_column,
+            cast(StorageItem.name, Text).label("relative_path"),
+        ).where(StorageItem.id == id, StorageItem.owner_id == owner_id)
+        cte = anchor.cte("cte", recursive=True)
+
+        recursive_part = select(
+            StorageItem.id,
+            StorageItem.kind,
+            s3_key_column,
+            (cte.c.relative_path + "/" + StorageItem.name).label("relative_path"),
+        ).join(
+            cte,
+            and_(StorageItem.parent_id == cte.c.id, StorageItem.owner_id == owner_id),
+        )
+
+        cte = cte.union_all(recursive_part)
+
+        final_relative_path = case(
+            (cte.c.kind == StorageItemKind.FOLDER, cte.c.relative_path + "/"),
+            else_=cte.c.relative_path,
+        ).label("relative_path")
+        stmt = select(final_relative_path, cte.c.s3_key)
+        result = await self._session.execute(stmt)
+        return [SubtreeNode(*file) for file in result.all()]
