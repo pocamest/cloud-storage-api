@@ -1,4 +1,5 @@
 import io
+import posixpath
 import uuid
 import zipfile
 
@@ -7,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.storage.adapters import S3Adapter
-from app.storage.constants import UNIQUE_NAME_WITHIN_PARENT
+from app.storage.constants import ROOT_PATH, UNIQUE_NAME_WITHIN_PARENT
 from app.storage.dtos import DownloadFileDTO, DownloadFolderDTO, FileDTO, FolderDTO
 from app.storage.exceptions import (
     FileNotFoundError,
@@ -75,17 +76,17 @@ class StorageService:
         if id in parents:
             raise FolderTargetIsSubfolder()
 
-    async def _build_path(self, id: uuid.UUID | None, owner_id: uuid.UUID) -> str:
-        root = "/"
-        if id is None:
-            return root
+    async def _get_base_path(self, id: uuid.UUID | None, owner_id: uuid.UUID) -> str:
+        if id is not None:
+            parent_path = await self._storage_item_repo.get_path(
+                id=id, owner_id=owner_id
+            )
+            if parent_path is None:
+                raise FolderNotFoundError()
+        else:
+            parent_path = ROOT_PATH
 
-        items = await self._storage_item_repo.get_names_for_self_and_parents(
-            id=id, owner_id=owner_id
-        )
-
-        path = "/".join(items)
-        return f"{root}{path}"
+        return parent_path
 
     def _map_file_to_dto(self, file: File, path: str) -> FileDTO:
         return FileDTO(
@@ -122,8 +123,8 @@ class StorageService:
         content: bytes,
         owner: User,
     ) -> FileDTO:
-        if parent_id is not None:
-            await self._check_folder_exists(id=parent_id, owner_id=owner.id)
+        parent_path = await self._get_base_path(id=parent_id, owner_id=owner.id)
+
         await self._check_name_not_exists_in_parent(
             name=filename, parent_id=parent_id, owner_id=owner.id
         )
@@ -148,7 +149,7 @@ class StorageService:
 
             await self._session.commit()
 
-            path = await self._build_path(id=file.id, owner_id=file.owner_id)
+            path = posixpath.join(parent_path, file.name)
 
             return self._map_file_to_dto(file=file, path=path)
 
@@ -171,7 +172,11 @@ class StorageService:
         if file is None:
             raise FileNotFoundError()
 
-        path = await self._build_path(id=file.id, owner_id=file.owner_id)
+        path = await self._storage_item_repo.get_path(
+            id=file.id, owner_id=file.owner_id
+        )
+        if path is None:
+            raise FileNotFoundError()
 
         return self._map_file_to_dto(file=file, path=path)
 
@@ -202,8 +207,7 @@ class StorageService:
     async def create_folder(
         self, name: str, parent_id: uuid.UUID | None, owner: User
     ) -> FolderDTO:
-        if parent_id is not None:
-            await self._check_folder_exists(id=parent_id, owner_id=owner.id)
+        parent_path = await self._get_base_path(id=parent_id, owner_id=owner.id)
 
         id = uuid.uuid4()
         try:
@@ -213,7 +217,7 @@ class StorageService:
 
             await self._session.commit()
 
-            path = await self._build_path(id=folder.id, owner_id=folder.owner_id)
+            path = posixpath.join(parent_path, folder.name)
 
             return self._map_folder_to_dto(folder=folder, path=path)
 
@@ -230,7 +234,11 @@ class StorageService:
         if folder is None:
             raise FolderNotFoundError()
 
-        path = await self._build_path(id=folder.id, owner_id=folder.owner_id)
+        path = await self._storage_item_repo.get_path(
+            id=folder.id, owner_id=folder.owner_id
+        )
+        if path is None:
+            raise FolderNotFoundError()
 
         return self._map_folder_to_dto(folder=folder, path=path)
 
@@ -249,21 +257,15 @@ class StorageService:
     async def get_folder_items(
         self, id: uuid.UUID | None, owner: User
     ) -> list[FileDTO | FolderDTO]:
-        if id is not None:
-            await self._check_folder_exists(id=id, owner_id=owner.id)
+        base_path = await self._get_base_path(id=id, owner_id=owner.id)
 
         items = await self._storage_item_repo.find_by_parent_and_owner(
             owner_id=owner.id, parent_id=id
         )
 
         result: list[FileDTO | FolderDTO] = []
-
-        base_path = await self._build_path(id=id, owner_id=owner.id)
-        # TODO: пока такой костыль, по-другому не придумал как собирать путь
-        base_path = "" if base_path == "/" else base_path
-
         for item in items:
-            path = f"{base_path}/{item.name}"
+            path = posixpath.join(base_path, item.name)
             result.append(self._map_to_dto(item=item, path=path))
 
         return result
@@ -271,19 +273,15 @@ class StorageService:
     async def get_root_items(self, owner: User) -> list[FileDTO | FolderDTO]:
         return await self.get_folder_items(id=None, owner=owner)
 
+    # TODO: еще подумать над регистром запроса
     async def search(self, query: str, owner: User) -> list[FileDTO | FolderDTO]:
-        items = await self._storage_item_repo.find_by_name_substring(
+        results = await self._storage_item_repo.find_by_name_with_path(
             name_substring=query, owner_id=owner.id
         )
 
-        result: list[FileDTO | FolderDTO] = []
-
-        for item in items:
-            # TODO: Проблема N+1
-            path = await self._build_path(id=item.id, owner_id=item.owner_id)
-            result.append(self._map_to_dto(item=item, path=path))
-
-        return result
+        return [
+            self._map_to_dto(item=result.item, path=result.path) for result in results
+        ]
 
     async def rename_file(self, id: uuid.UUID, new_name: str, owner: User) -> FileDTO:
         file = await self._check_file_exists(id=id, owner_id=owner.id)
@@ -297,7 +295,9 @@ class StorageService:
                 raise NameAlreadyTakenError() from e
             raise
 
-        path = await self._build_path(id=file.id, owner_id=file.owner_id)
+        path = await self._storage_item_repo.get_path(id=file.id, owner_id=owner.id)
+        if path is None:
+            raise FileNotFoundError()
 
         return self._map_file_to_dto(file=file, path=path)
 
@@ -306,8 +306,7 @@ class StorageService:
     ) -> FileDTO:
         file = await self._check_file_exists(id=id, owner_id=owner.id)
 
-        if new_parent_id is not None:
-            await self._check_folder_exists(id=new_parent_id, owner_id=file.owner_id)
+        new_parent_path = await self._get_base_path(id=new_parent_id, owner_id=owner.id)
 
         try:
             file.parent_id = new_parent_id
@@ -318,7 +317,7 @@ class StorageService:
                 raise NameAlreadyTakenError() from e
             raise
 
-        path = await self._build_path(id=file.id, owner_id=file.owner_id)
+        path = posixpath.join(new_parent_path, file.name)
 
         return self._map_file_to_dto(file=file, path=path)
 
@@ -336,7 +335,11 @@ class StorageService:
                 raise NameAlreadyTakenError() from e
             raise
 
-        path = await self._build_path(id=folder.id, owner_id=folder.owner_id)
+        path = await self._storage_item_repo.get_path(
+            id=folder.id, owner_id=folder.owner_id
+        )
+        if path is None:
+            raise FolderNotFoundError()
 
         return self._map_folder_to_dto(folder=folder, path=path)
 
@@ -348,8 +351,8 @@ class StorageService:
 
         folder = await self._check_folder_exists(id=id, owner_id=owner.id)
 
+        new_parent_path = await self._get_base_path(id=new_parent_id, owner_id=owner.id)
         if new_parent_id is not None:
-            await self._check_folder_exists(id=new_parent_id, owner_id=owner.id)
             await self._check_target_is_not_subfolder(
                 id=id, new_parent_id=new_parent_id, owner_id=folder.owner_id
             )
@@ -363,7 +366,7 @@ class StorageService:
                 raise NameAlreadyTakenError() from e
             raise
 
-        path = await self._build_path(id=folder.id, owner_id=folder.owner_id)
+        path = posixpath.join(new_parent_path, folder.name)
 
         return self._map_folder_to_dto(folder=folder, path=path)
 
