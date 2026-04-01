@@ -1,19 +1,13 @@
 import uuid
 from collections.abc import Sequence
-from typing import NamedTuple, TypeVar
 
-from sqlalchemy import Text, and_, case, cast, literal, select
+from sqlalchemy import Text, and_, case, cast, func, literal, select
+from sqlalchemy.dialects.postgresql import aggregate_order_by
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.storage.models import StorageItem
-from app.storage.types import StorageItemKind
-
-StorageItemT = TypeVar("StorageItemT", bound=StorageItem)
-
-
-class SubtreeNode(NamedTuple):
-    relative_path: str
-    s3_key: str | None
+from app.storage.rows import StorageItemWithPathRow, SubtreeNodeRow
+from app.storage.types import StorageItemKind, StorageItemT
 
 
 class StorageItemRepository:
@@ -57,10 +51,7 @@ class StorageItemRepository:
         result = await self._session.execute(stmt)
         return result.scalars().all()
 
-    # TODO: Проверить синтаксис и отрефакторить
-    async def get_names_for_self_and_parents(
-        self, id: uuid.UUID, owner_id: uuid.UUID
-    ) -> Sequence[str]:
+    async def get_path(self, id: uuid.UUID, owner_id: uuid.UUID) -> str | None:
         anchor = select(
             StorageItem.parent_id, StorageItem.name, literal(0).label("level")
         ).where(StorageItem.id == id, StorageItem.owner_id == owner_id)
@@ -69,7 +60,44 @@ class StorageItemRepository:
         recursive_part = select(
             StorageItem.parent_id,
             StorageItem.name,
-            cte.c.level + 1,  # TODO: здесь label наверное стоит добавить
+            (cte.c.level + 1).label("level"),
+        ).join(
+            cte,
+            and_(
+                StorageItem.id == cte.c.parent_id,
+                StorageItem.owner_id == owner_id,
+            ),
+        )
+
+        cte = cte.union_all(recursive_part)
+        stmt = select(
+            "/"
+            + func.string_agg(
+                cte.c.name,
+                aggregate_order_by(literal("/"), cte.c.level.desc()),
+            )
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def find_by_name_with_path(
+        self, name_substring: str, owner_id: uuid.UUID
+    ) -> list[StorageItemWithPathRow]:
+        anchor = select(
+            StorageItem.id.label("target_id"),
+            StorageItem.parent_id,
+            StorageItem.name,
+            literal(0).label("level"),
+        ).where(
+            StorageItem.name.icontains(name_substring), StorageItem.owner_id == owner_id
+        )
+        cte = anchor.cte("cte", recursive=True)
+
+        recursive_part = select(
+            cte.c.target_id,
+            StorageItem.parent_id,
+            StorageItem.name,
+            (cte.c.level + 1).label("level"),
         ).join(
             cte,
             and_(
@@ -80,19 +108,27 @@ class StorageItemRepository:
 
         cte = cte.union_all(recursive_part)
 
-        stmt = select(cte.c.name).order_by(cte.c.level.desc())
-        result = await self._session.execute(stmt)
-        return result.scalars().all()
-
-    async def find_by_name_substring(
-        self, name_substring: str, owner_id: uuid.UUID
-    ) -> Sequence[StorageItem]:
-        stmt = select(StorageItem).where(
-            StorageItem.name.icontains(name_substring),
-            StorageItem.owner_id == owner_id,
+        path_subq = (
+            select(
+                cte.c.target_id,
+                (
+                    "/"
+                    + func.string_agg(
+                        cte.c.name,
+                        aggregate_order_by(literal("/"), cte.c.level.desc()),
+                    )
+                ).label("path"),
+            )
+            .group_by(cte.c.target_id)
+            .subquery()
         )
+
+        stmt = select(StorageItem, path_subq.c.path).join(
+            path_subq, StorageItem.id == path_subq.c.target_id
+        )
+
         result = await self._session.execute(stmt)
-        return result.scalars().all()
+        return [StorageItemWithPathRow(*item) for item in result.all()]
 
     async def get_s3_key_for_all_children(
         self, id: uuid.UUID, owner_id: uuid.UUID
@@ -136,7 +172,7 @@ class StorageItemRepository:
 
     async def get_subtree(
         self, id: uuid.UUID, owner_id: uuid.UUID
-    ) -> list[SubtreeNode]:
+    ) -> list[SubtreeNodeRow]:
         s3_key_column = StorageItem.__table__.c.s3_key
         anchor = select(
             StorageItem.id,
@@ -164,4 +200,4 @@ class StorageItemRepository:
         ).label("relative_path")
         stmt = select(final_relative_path, cte.c.s3_key)
         result = await self._session.execute(stmt)
-        return [SubtreeNode(*file) for file in result.all()]
+        return [SubtreeNodeRow(*file) for file in result.all()]
