@@ -35,7 +35,7 @@ class StorageService:
         self._s3_adapter = s3_adapter
         self._s3_files_prefix = settings.s3_files_prefix
 
-    async def _check_file_exists(self, id: uuid.UUID, owner_id: uuid.UUID) -> File:
+    async def _fetch_file(self, id: uuid.UUID, owner_id: uuid.UUID) -> File:
         file = await self._storage_item_repo.find_by_id_and_owner(
             id=id, owner_id=owner_id, model_class=File
         )
@@ -44,7 +44,7 @@ class StorageService:
 
         return file
 
-    async def _check_folder_exists(self, id: uuid.UUID, owner_id: uuid.UUID) -> Folder:
+    async def _fetch_folder(self, id: uuid.UUID, owner_id: uuid.UUID) -> Folder:
         folder = await self._storage_item_repo.find_by_id_and_owner(
             id=id, owner_id=owner_id, model_class=Folder
         )
@@ -243,7 +243,7 @@ class StorageService:
         return self._map_folder_to_dto(folder=folder, path=path)
 
     async def delete_folder(self, id: uuid.UUID, owner: User) -> None:
-        folder = await self._check_folder_exists(id=id, owner_id=owner.id)
+        folder = await self._fetch_folder(id=id, owner_id=owner.id)
 
         s3_keys = await self._storage_item_repo.get_s3_key_for_all_children(
             id=id, owner_id=owner.id
@@ -284,7 +284,7 @@ class StorageService:
         ]
 
     async def rename_file(self, id: uuid.UUID, new_name: str, owner: User) -> FileDTO:
-        file = await self._check_file_exists(id=id, owner_id=owner.id)
+        file = await self._fetch_file(id=id, owner_id=owner.id)
 
         try:
             file.name = new_name
@@ -304,7 +304,7 @@ class StorageService:
     async def move_file(
         self, id: uuid.UUID, new_parent_id: uuid.UUID | None, owner: User
     ) -> FileDTO:
-        file = await self._check_file_exists(id=id, owner_id=owner.id)
+        file = await self._fetch_file(id=id, owner_id=owner.id)
 
         new_parent_path = await self._get_base_path(id=new_parent_id, owner_id=owner.id)
 
@@ -324,7 +324,7 @@ class StorageService:
     async def rename_folder(
         self, id: uuid.UUID, new_name: str, owner: User
     ) -> FolderDTO:
-        folder = await self._check_folder_exists(id=id, owner_id=owner.id)
+        folder = await self._fetch_folder(id=id, owner_id=owner.id)
 
         try:
             folder.name = new_name
@@ -349,7 +349,7 @@ class StorageService:
         if id == new_parent_id:
             raise FolderTargetIsSelf()
 
-        folder = await self._check_folder_exists(id=id, owner_id=owner.id)
+        folder = await self._fetch_folder(id=id, owner_id=owner.id)
 
         new_parent_path = await self._get_base_path(id=new_parent_id, owner_id=owner.id)
         if new_parent_id is not None:
@@ -371,7 +371,7 @@ class StorageService:
         return self._map_folder_to_dto(folder=folder, path=path)
 
     async def download_folder(self, id: uuid.UUID, owner: User) -> DownloadFolderDTO:
-        folder = await self._check_folder_exists(id=id, owner_id=owner.id)
+        folder = await self._fetch_folder(id=id, owner_id=owner.id)
         folder_items = await self._storage_item_repo.get_subtree(
             id=folder.id, owner_id=folder.owner_id
         )
