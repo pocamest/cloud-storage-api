@@ -20,6 +20,18 @@ from app.storage.schemas import (
 )
 from app.storage.types import StorageItemName, ValidUploadFile
 
+
+def _build_download_response(content: bytes, filename: str) -> Response:
+    encode_filename = quote(filename)
+    return Response(
+        content=content,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encode_filename}"
+        },
+    )
+
+
 router = APIRouter(prefix="/storage", tags=["storage"])
 
 
@@ -61,22 +73,12 @@ async def delete_file(
     await storage_service.delete_file(id=file_id, owner=user)
 
 
-# TODO: потом переделам на стриминг
 @router.get("/files/{file_id}/download")
 async def download_file(
     file_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
 ) -> Response:
     data = await storage_service.download_file(id=file_id, owner=user)
-    encode_filename = quote(data.filename)
-
-    # TODO: потом спрятать
-    return Response(
-        data.content,
-        media_type="application/octet-stream",
-        headers={
-            "Content-Disposition": f"attachment; filename*=UTF-8''{encode_filename}"
-        },
-    )
+    return _build_download_response(content=data.content, filename=data.filename)
 
 
 @router.post("/files/{file_id}/rename", response_model=FileRead)
@@ -131,16 +133,8 @@ async def download_folder(
     folder_id: uuid.UUID, storage_service: StorageServiceDep, user: CurrentUserDep
 ) -> Response:
     data = await storage_service.download_folder(id=folder_id, owner=user)
-    encode_archive_name = quote(data.archive_name)
 
-    # TODO: потом спрятать
-    return Response(
-        data.content,
-        media_type="application/octet-stream",
-        headers={
-            "Content-Disposition": f"attachment; filename*=UTF-8''{encode_archive_name}"
-        },
-    )
+    return _build_download_response(content=data.content, filename=data.archive_name)
 
 
 @router.get("/folders/root/items", response_model=list[StorageItemRead])
