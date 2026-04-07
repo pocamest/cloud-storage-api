@@ -1,4 +1,5 @@
 from fastapi import APIRouter, FastAPI
+from fastapi.responses import RedirectResponse
 
 from app.auth.router import router as auth_router
 from app.core.exception_handlers import register_exceptions_handler
@@ -12,6 +13,12 @@ setup_logging()
 
 app = FastAPI(title="Cloud storage API", lifespan=lifespan)
 register_exceptions_handler(app)
+
+
+@app.get("/", include_in_schema=False)
+async def show_docs() -> RedirectResponse:
+    return RedirectResponse("/docs")
+
 
 api_router = APIRouter()
 
