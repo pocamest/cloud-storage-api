@@ -40,12 +40,17 @@ API для облачного хранилища. Спроектирован в 
     uv sync
     ```
 
-5. Применение миграций:
+5. Установка pre-commit хуков:
+    ```bash
+    uv run pre-commit install
+    ```
+
+6. Применение миграций:
     ```bash
     uv run alembic upgrade head
     ```
 
-6. Запуск сервера:
+7. Запуск сервера:
     ```bash
     uv run uvicorn app.main:app --reload
     ```
