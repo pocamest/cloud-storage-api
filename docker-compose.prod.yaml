@@ -13,7 +13,8 @@ services:
         condition: service_completed_successfully
       db-migrate:
         condition: service_completed_successfully
-    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+    # TODO: Рассмотреть запуск напрямую из .venv, убрав uv run
+    command: uv run --no-sync uvicorn app.main:app --host 0.0.0.0 --port 8000
 
   create-bucket:
     image: minio/mc:RELEASE.2025-08-13T08-35-41Z
@@ -34,7 +35,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: uv run alembic upgrade head
+    command: uv run --no-sync alembic upgrade head
 
 
   postgres:

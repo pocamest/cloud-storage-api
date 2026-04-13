@@ -4,4 +4,4 @@ WORKDIR /app
 
 # TODO: рассмотреть кэширование для ускорения сборки
 COPY . .
-RUN uv sync --no-dev
+RUN uv sync --frozen --no-dev
