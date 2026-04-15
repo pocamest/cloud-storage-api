@@ -1,8 +1,10 @@
 # Cloud Storage API
 
-API для облачного хранилища. Спроектирован в рамках модульного монолита и async-first.
+API для облачного хранилища. Спроектирован в рамках async-first.
 
-## Стэк:
+Демо (Swagger): http://87.242.85.167:8000
+
+## Стек:
 
 - **Core:** Python, FastAPI, Uvicorn
 - **Databases:** PostgreSQL 15+, Redis
@@ -14,43 +16,54 @@ API для облачного хранилища. Спроектирован в 
 
 ### Предварительные требования
 - uv
-- Docker & Docker Compose
+- Docker
 
-### Настройка локальной разработки
+### Подготовка проекта
 
 1. Клонирование репозитория:
     ```bash
     git clone https://github.com/pocamest/cloud-storage-api.git
     cd cloud-storage-api
     ```
-
-2. Настройка:
-    На основе примера заполнить `.env`.
+2. На основе примера заполнить `.env`:
     ```bash
     cp .env.example .env
     ```
 
-3. Запуск инфраструктуры:
+### Локальная разработка
+
+Инфраструктура приложения - PostgreSQL, Redis и Minio (с созданием бакета) запускаются в Docker, а код работает локально на хосте с помощью uv.
+
+1. Запуск инфраструктуры:
     ```bash
     docker compose up -d
     ```
 
-4. Установка зависимостей:
+2. Установка зависимостей:
     ```bash
     uv sync
     ```
 
-5. Установка pre-commit хуков:
+3. Установка pre-commit хуков:
     ```bash
     uv run pre-commit install
     ```
 
-6. Применение миграций:
+4. Применение миграций:
     ```bash
     uv run alembic upgrade head
     ```
 
-7. Запуск сервера:
+5. Запуск сервера:
     ```bash
     uv run uvicorn app.main:app --reload
+    ```
+
+### Деплой
+
+Для деплоя используется отдельная конфигурация, где вся инфраструктура и само приложение (включая применение миграций) запускаются в Docker.
+
+1. Запуск приложения:
+    ```bash
+    docker compose -f docker-compose.prod.yaml up -d --build
     ```
