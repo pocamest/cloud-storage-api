@@ -1,13 +1,15 @@
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
-from types_aiobotocore_s3 import S3Client
-from types_aiobotocore_s3.type_defs import ObjectIdentifierTypeDef
+if TYPE_CHECKING:
+    from types_aiobotocore_s3 import S3Client
+    from types_aiobotocore_s3.type_defs import ObjectIdentifierTypeDef
 
 from app.core.config import settings
 
 
 class S3Adapter:
-    def __init__(self, client: S3Client, limit_delete: int = 1000) -> None:
+    def __init__(self, client: "S3Client", limit_delete: int = 1000) -> None:
         self._client = client
         self._bucket = settings.s3_bucket_name
         self._limit_delete = limit_delete
@@ -25,7 +27,7 @@ class S3Adapter:
 
     async def delete_objects(self, keys: Sequence[str]) -> None:
         for i in range(0, len(keys), self._limit_delete):
-            objects: list[ObjectIdentifierTypeDef] = [
+            objects: list["ObjectIdentifierTypeDef"] = [  # noqa: UP037
                 {"Key": key} for key in keys[i : i + self._limit_delete]
             ]
             await self._client.delete_objects(

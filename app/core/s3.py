@@ -1,7 +1,10 @@
 from contextlib import AsyncExitStack
+from typing import TYPE_CHECKING
 
 from aiobotocore.session import get_session
-from types_aiobotocore_s3 import S3Client
+
+if TYPE_CHECKING:
+    from types_aiobotocore_s3 import S3Client
 
 from app.core.config import settings
 
@@ -25,7 +28,7 @@ class S3Provider:
         )
 
     @property
-    def client(self) -> S3Client:
+    def client(self) -> "S3Client":
         if self._client is None:
             raise RuntimeError("S3 is not initialized")
         return self._client
