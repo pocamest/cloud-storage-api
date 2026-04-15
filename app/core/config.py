@@ -8,12 +8,12 @@ class Settings(BaseSettings):
     )
 
     postgres_user: str = "app"
-    postgres_password: str = "change_me"
+    postgres_password: str
     postgres_db: str = "cloud_storage"
     postgres_host: str = "localhost"
     postgres_port: int = 5432
 
-    redis_password: str = ""
+    redis_password: str
     redis_port: int = 6379
     redis_host: str = "localhost"
 
