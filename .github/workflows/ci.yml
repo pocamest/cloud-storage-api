@@ -10,6 +10,8 @@ on:
 jobs:
     checks:
         env:
+            POSTGRES_PASSWORD: placeholder
+            REDIS_PASSWORD: placeholder
             TOKEN_SECRET_KEY: placeholder
             S3_ACCESS_KEY: admin
             S3_SECRET_KEY: placeholder

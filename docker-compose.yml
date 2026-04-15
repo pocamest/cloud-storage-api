@@ -1,4 +1,16 @@
 services:
+  create-bucket:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    env_file:
+      - .env
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "mc alias set myminio http://minio:9000
+      ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
+      mc mb --ignore-existing myminio/${S3_BUCKET_NAME}"
+
   postgres:
     image: postgres:18-alpine
     restart: always
