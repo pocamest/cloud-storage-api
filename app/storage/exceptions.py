@@ -1,5 +1,6 @@
 from fastapi import status
 
+from app.core.config import settings
 from app.core.exceptions import AppError, ErrorCode
 
 
@@ -11,6 +12,14 @@ class FileNotFoundError(StorageError):
     status_code = status.HTTP_404_NOT_FOUND
     detail = "File not found"
     error_code = ErrorCode.FILE_NOT_FOUND
+
+
+class FileTooLargeError(StorageError):
+    status_code = status.HTTP_413_CONTENT_TOO_LARGE
+    detail = (
+        f"File is too large, limit size: {settings.file_size_limit.human_readable()}"
+    )
+    error_code = ErrorCode.FILE_TOO_LARGE
 
 
 class FolderNotFoundError(StorageError):

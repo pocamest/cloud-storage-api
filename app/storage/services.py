@@ -115,12 +115,12 @@ class StorageService:
 
         raise ValueError(f"Invalid kind: {item}")
 
-    # TODO: нужно разобраться с ограничением на размер файла
     async def upload_file(
         self,
         filename: str,
         parent_id: uuid.UUID | None,
         content: bytes,
+        size: int,
         owner: User,
     ) -> FileDTO:
         parent_path = await self._get_base_path(id=parent_id, owner_id=owner.id)
@@ -142,7 +142,7 @@ class StorageService:
                     name=filename,
                     owner_id=owner.id,
                     parent_id=parent_id,
-                    size=len(content),
+                    size=size,
                     s3_key=s3_key,
                 )
             )

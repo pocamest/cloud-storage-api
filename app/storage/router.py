@@ -54,8 +54,13 @@ async def upload_file(
 ) -> FileDTO:
     filename = cast(StorageItemName, file.filename)
     content = await file.read()
+    file_size = len(content)
     return await storage_service.upload_file(
-        filename=filename, parent_id=parent_id, content=content, owner=user
+        filename=filename,
+        parent_id=parent_id,
+        content=content,
+        size=file_size,
+        owner=user,
     )
 
 

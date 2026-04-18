@@ -1,4 +1,4 @@
-from pydantic import PostgresDsn, RedisDsn
+from pydantic import ByteSize, PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     s3_endpoint_url: str = "http://localhost:9000"
     s3_bucket_name: str = "cloud-storage-local"
     s3_files_prefix: str = "files"
+
+    file_size_limit: ByteSize = ByteSize(5 * 1024 * 1024)
 
     log_level: str = "INFO"
 
