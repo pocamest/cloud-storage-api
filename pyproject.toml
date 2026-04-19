@@ -68,9 +68,6 @@ asyncio_default_fixture_loop_scope = "session"
 filterwarnings = [
     "ignore::DeprecationWarning:testcontainers.*",
 ]
-markers = [
-    "infra: Checks tests infrastructure is set up correctly"
-]
 addopts = [
     "--verbose",
     "--strict-markers",
