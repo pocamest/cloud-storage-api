@@ -28,6 +28,15 @@ class FolderNotFoundError(StorageError):
     error_code = ErrorCode.FOLDER_NOT_FOUND
 
 
+class FolderTooLargeToDownloadError(StorageError):
+    status_code = status.HTTP_400_BAD_REQUEST
+    detail = (
+        "Folder is too large to download, "
+        f"limit size: {settings.folder_download_limit.human_readable()}"
+    )
+    error_code = ErrorCode.FOLDER_TOO_LARGE_TO_DOWNLOAD
+
+
 class FolderTargetIsSelf(StorageError):
     status_code = status.HTTP_409_CONFLICT
     detail = "Folder cannot be moved into self"

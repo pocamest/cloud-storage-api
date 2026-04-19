@@ -15,6 +15,7 @@ from app.storage.exceptions import (
     FolderNotFoundError,
     FolderTargetIsSelf,
     FolderTargetIsSubfolder,
+    FolderTooLargeToDownloadError,
     NameAlreadyTakenError,
 )
 from app.storage.models import File, Folder, StorageItem
@@ -273,7 +274,6 @@ class StorageService:
     async def get_root_items(self, owner: User) -> list[FileDTO | FolderDTO]:
         return await self.get_folder_items(id=None, owner=owner)
 
-    # TODO: еще подумать над регистром запроса
     async def search(self, query: str, owner: User) -> list[FileDTO | FolderDTO]:
         results = await self._storage_item_repo.find_by_name_with_path(
             name_substring=query, owner_id=owner.id
@@ -375,6 +375,10 @@ class StorageService:
         folder_items = await self._storage_item_repo.get_subtree(
             id=folder.id, owner_id=folder.owner_id
         )
+
+        folder_size = sum(item.size for item in folder_items if item.size is not None)
+        if folder_size > settings.folder_download_limit:
+            raise FolderTooLargeToDownloadError()
 
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
