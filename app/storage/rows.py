@@ -6,6 +6,7 @@ from app.storage.models import StorageItem
 class SubtreeNodeRow(NamedTuple):
     relative_path: str
     s3_key: str | None
+    size: int | None
 
 
 class StorageItemWithPathRow(NamedTuple):

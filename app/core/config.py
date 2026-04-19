@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     s3_files_prefix: str = "files"
 
     file_size_limit: ByteSize = ByteSize(5 * 1024 * 1024)
+    folder_download_limit: ByteSize = ByteSize(50 * 1024 * 1024)
 
     log_level: str = "INFO"
 

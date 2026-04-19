@@ -174,10 +174,12 @@ class StorageItemRepository:
         self, id: uuid.UUID, owner_id: uuid.UUID
     ) -> list[SubtreeNodeRow]:
         s3_key_column = StorageItem.__table__.c.s3_key
+        size_column = StorageItem.__table__.c.size
         anchor = select(
             StorageItem.id,
             StorageItem.kind,
             s3_key_column,
+            size_column,
             cast(StorageItem.name, Text).label("relative_path"),
         ).where(StorageItem.id == id, StorageItem.owner_id == owner_id)
         cte = anchor.cte("cte", recursive=True)
@@ -186,6 +188,7 @@ class StorageItemRepository:
             StorageItem.id,
             StorageItem.kind,
             s3_key_column,
+            size_column,
             (cte.c.relative_path + "/" + StorageItem.name).label("relative_path"),
         ).join(
             cte,
@@ -198,6 +201,6 @@ class StorageItemRepository:
             (cte.c.kind == StorageItemKind.FOLDER, cte.c.relative_path + "/"),
             else_=cte.c.relative_path,
         ).label("relative_path")
-        stmt = select(final_relative_path, cte.c.s3_key)
+        stmt = select(final_relative_path, cte.c.s3_key, cte.c.size)
         result = await self._session.execute(stmt)
         return [SubtreeNodeRow(*file) for file in result.all()]
