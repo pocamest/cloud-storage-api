@@ -2,13 +2,13 @@
 
 API для облачного хранилища. Спроектирован в рамках async-first.
 
-Демо (Swagger): http://87.242.85.167
+Демо (Swagger): http://87.242.85.167 (лимит на загрузку файлов: 5 МБ и скачивание архива папки: 50 МБ)
 
 ## Стек:
 
-- **Core:** Python, FastAPI, Uvicorn
+- **Core:** Python 3.13, FastAPI, Uvicorn, Nginx
 - **Databases:** PostgreSQL 15+, Redis
--  **ORM & Migrations:** SQLAlchemy, Alembic
+- **ORM & Migrations:** SQLAlchemy, Alembic
 - **Storage:** MinIO, aiobotocore
 - **Dev Tools:** Docker Compose, uv, ruff, mypy, pre-commit
 
@@ -61,7 +61,7 @@ API для облачного хранилища. Спроектирован в 
 
 ### Деплой
 
-Для деплоя используется отдельная конфигурация, где вся инфраструктура и само приложение (включая применение миграций) запускаются в Docker.
+Для деплоя используется отдельная конфигурация, где вся инфраструктура (включая Nginx) и само приложение (включая применение миграций) запускаются в Docker.
 
 1. Запуск приложения:
     ```bash
