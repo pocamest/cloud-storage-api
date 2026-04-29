@@ -142,6 +142,12 @@ class AuthService:
             user=user,
         )
 
+    async def _fetch_user(self, user_id: uuid.UUID) -> User:
+        try:
+            return await self._user_service.get_by_id(user_id)
+        except UserNotFoundError as e:
+            raise TokenInvalidError() from e
+
     async def login(self, auth_data: LoginRequest) -> AuthDTO:
         user = await self._user_service.find_by_credentials(
             email=auth_data.email, password=auth_data.password
@@ -159,15 +165,11 @@ class AuthService:
     async def get_user_from_access_token(self, token: str) -> User:
         user_id = self._token_service.verify_access_token(token)
 
-        try:
-            user = await self._user_service.get_by_id(user_id)
-        except UserNotFoundError as e:
-            raise TokenInvalidError() from e
-
-        return user
+        return await self._fetch_user(user_id)
 
     async def refresh(self, refresh_token: str) -> TokenDTO:
         user_id = await self._token_service.verify_refresh_token(refresh_token)
+        await self._fetch_user(user_id)
 
         access_token = self._token_service.create_access_token(user_id)
 
