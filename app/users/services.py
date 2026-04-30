@@ -1,8 +1,10 @@
 import uuid
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import dummy_verify, hash_password, verify_password
+from app.users.constants import UQ_USERS_EMAIL
 from app.users.exceptions import UserAlreadyExistsError, UserNotFoundError
 from app.users.models import User
 from app.users.repositories import UserRepository
@@ -22,8 +24,14 @@ class UserService:
         created_user = self._user_repo.add(
             User(email=user_data.email, password_hash=password_hash)
         )
+        try:
+            await self._session.commit()
+        except IntegrityError as e:
+            await self._session.rollback()
+            if UQ_USERS_EMAIL in str(e.orig):
+                raise UserAlreadyExistsError() from e
+            raise
 
-        await self._session.commit()
         await self._session.refresh(created_user)
 
         return created_user
