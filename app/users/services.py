@@ -2,7 +2,7 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import hash_password, verify_password
+from app.core.security import dummy_verify, hash_password, verify_password
 from app.users.exceptions import UserAlreadyExistsError, UserNotFoundError
 from app.users.models import User
 from app.users.repositories import UserRepository
@@ -32,6 +32,7 @@ class UserService:
         user = await self._user_repo.find_by_email(email)
 
         if user is None:
+            dummy_verify(password)
             return None
 
         if not verify_password(raw_password=password, password_hash=user.password_hash):
